@@ -2,7 +2,6 @@
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
-const multer = require('multer');
 const dotenv = require('dotenv');
 const axios = require('axios')
 
@@ -25,19 +24,13 @@ app.use(cors({
 }));
 app.use(express.json());
 
-const storage = multer.memoryStorage();
-const upload = multer({ 
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // Лимит: 10MB
-});
+
 const authMiddleware = async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1]; // Берём токен из заголовка
 
   if (!token) {
     return res.status(401).json({ error: "Нет токена" });
   }
-
-  
 
   // Проверяем токен через Supabase
   const { data: user, error } = await supabase.auth.getUser(token);

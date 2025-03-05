@@ -18,7 +18,11 @@ const supabase = createClient(
 );
 
 // Middleware
-app.use(cors('*'));
+app.use(cors({
+  origin: 'https://www.neuro-aura.com',  // Разрешённый домен
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true // Если нужно передавать cookies
+}));
 app.use(express.json());
 
 const storage = multer.memoryStorage();
@@ -46,6 +50,9 @@ const authMiddleware = async (req, res, next) => {
   next();
 };
 // 📌 Получить всех пользователей
+app.get('/', (req, res) => {
+  res.send('ALL работает!');
+});
 
 app.post('/create-invoice', async (req, res) => {
   try {

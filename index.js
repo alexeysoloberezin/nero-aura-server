@@ -21,7 +21,7 @@ const supabase = createClient(
 );
 
 const apiKeyMiddleware = (req, res, next) => {
-  const apiKey = req.headers["api-key"];
+  const apiKey = req.headers["x-api-key"];
   console.log('req,', req)
   console.log('headers', req.headers)
   console.log('apiKey', apiKey)

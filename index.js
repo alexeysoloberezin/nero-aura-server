@@ -12,6 +12,7 @@ dotenv.config();
 
 const PORT =  5000;
 const API_KEY = process.env.API_KEY
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET
 
 // Подключение к Supabase
 const supabase = createClient(
@@ -19,13 +20,24 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY // Полный доступ
 );
 
+const apiKeyMiddleware = (req, res, next) => {
+  const apiKey = req.headers["api-key"];
+  console.log('req,', req)
+  console.log('headers', req.headers)
+  console.log('apiKey', apiKey)
+  if (!apiKey || apiKey !== WEBHOOK_SECRET) {
+      return res.status(403).json({ error: "Invalid API Key" });
+  }
+  next();
+};
+
 // Middleware
-app.use(cors({
-  origin: 'https://www.neuro-aura.com',  // Разрешённый домен
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true // Если нужно передавать cookies
-}));
-// app.use(cors('*'));
+// app.use(cors({
+//   origin: 'https://www.neuro-aura.com',  // Разрешённый домен
+//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//   credentials: true // Если нужно передавать cookies
+// }));
+app.use(cors('*'));
 app.use(express.json());
 
 const transporter = nodemailer.createTransport({
@@ -281,7 +293,32 @@ app.post('/create-invoice', async (req, res) => {
   }
 });
 
-app.post('/lava-webhook', async  (req, res) => {
+
+app.post('/lava-webhook', apiKeyMiddleware, async  (req, res) => {
+  try {
+    const webhookData = req.body; // Данные от Lava.top
+
+    if (webhookData.status === 'completed') {
+      const buyer = webhookData.buyer.email
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ hasSub: true })
+        .eq('email', buyer)
+        .select()
+
+      if (error) throw error;
+    } else if (webhookData.status === 'failed') {
+      console.log(`❌ Платеж ${webhookData.contractId} не прошел.`);
+    }
+    res.status(200).json({ success: true, message: 'Webhook received' });
+  } catch (error) {
+    console.error('Ошибка обработки вебхука:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+app.post('/lava-webhook-recurrent', apiKeyMiddleware, async  (req, res) => {
   try {
     const webhookData = req.body; // Данные от Lava.top
 

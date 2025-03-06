@@ -32,12 +32,12 @@ const apiKeyMiddleware = (req, res, next) => {
 };
 
 // Middleware
-// app.use(cors({
-//   origin: 'https://www.neuro-aura.com',  // Разрешённый домен
-//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-//   credentials: true // Если нужно передавать cookies
-// }));
-app.use(cors('*'));
+app.use(cors({
+  origin: 'https://www.neuro-aura.com',  // Разрешённый домен
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true // Если нужно передавать cookies
+}));
+// app.use(cors('*'));
 app.use(express.json());
 
 const transporter = nodemailer.createTransport({

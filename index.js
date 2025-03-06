@@ -22,10 +22,16 @@ const supabase = createClient(
 
 const apiKeyMiddleware = (req, res, next) => {
   const apiKey = req.headers["x-api-key"];
+  const apiKeySecond = req.headers["X-Api-Key"]
+
   console.log('req,', req)
   console.log('headers', req.headers)
   console.log('apiKey', apiKey)
-  if (!apiKey || apiKey !== WEBHOOK_SECRET) {
+  console.log('apiKeySecond', apiKeySecond)
+
+  const key = apiKey || apiKeySecond
+
+  if (!key || key !== WEBHOOK_SECRET) {
       return res.status(403).json({ error: "Invalid API Key" });
   }
   next();

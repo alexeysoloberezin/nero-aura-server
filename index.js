@@ -273,7 +273,7 @@ app.post('/create-invoice', async (req, res) => {
   try {
     const { email, currency, paymentMethod } = req.body
     const { offerId, buyerLanguage } = {
-      offerId: '6829a784-ff86-4e1a-9bf4-93134af65a67',
+      offerId: '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae',
       buyerLanguage: 'EN'
     }
 

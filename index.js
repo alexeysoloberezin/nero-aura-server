@@ -7,8 +7,9 @@ const axios = require('axios')
 const nodemailer = require("nodemailer");
 const app = express();
 const { v4: uuidv4 } = require("uuid");
+const uploadRoute = require("./upload");
 
-dotenv.config();
+dotenv.config()
 
 const PORT =  5000;
 const API_KEY = process.env.API_KEY
@@ -24,10 +25,6 @@ const apiKeyMiddleware = (req, res, next) => {
   const apiKey = req.headers["x-api-key"];
   const apiKeySecond = req.headers["X-Api-Key"]
 
-  console.log('req,', req)
-  console.log('headers', req.headers)
-  console.log('apiKey', apiKey)
-  console.log('apiKeySecond', apiKeySecond)
 
   const key = apiKey || apiKeySecond
 
@@ -37,14 +34,18 @@ const apiKeyMiddleware = (req, res, next) => {
   next();
 };
 
+
 // Middleware
-app.use(cors({
-  origin: 'https://www.neuro-aura.com',  // Разрешённый домен
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true // Если нужно передавать cookies
-}));
-// app.use(cors('*'));
+// app.use(cors({
+//   origin: 'https://www.neuro-aura.com',  // Разрешённый домен
+//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//   credentials: true // Если нужно передавать cookies
+// }));
+app.use(cors('*'));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); 
+app.use(uploadRoute);
+app.use("/uploads", express.static("uploads"));
 
 const transporter = nodemailer.createTransport({
   host: "smtp.mail.ru",

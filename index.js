@@ -352,7 +352,7 @@ app.post('/lava-webhook-recurrent', apiKeyMiddleware, async  (req, res) => {
 app.get('/get-products', async (req, res) => {
   console.log('get prods')
   try {
-    const response = await axios.post(
+    const response = await axios.get(
       'https://gate.lava.top/api/v2/products',
       {
         headers: {

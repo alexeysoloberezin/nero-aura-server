@@ -36,12 +36,12 @@ const apiKeyMiddleware = (req, res, next) => {
 
 
 // Middleware
-app.use(cors({
-  origin: 'https://www.neuro-aura.com',  // Разрешённый домен
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true // Если нужно передавать cookies
-}));
-// app.use(cors('*'));
+// app.use(cors({
+//   origin: 'https://www.neuro-aura.com',  // Разрешённый домен
+//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//   credentials: true // Если нужно передавать cookies
+// }));
+app.use(cors('*'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); 
 app.use(uploadRoute);
@@ -277,7 +277,8 @@ app.post('/create-invoice', async (req, res) => {
       buyerLanguage: 'EN'
     }
 
-    let data = { email, offerId, currency, buyerLanguage, paymentMethod }
+
+    let data = { email, offerId, buyerLanguage }
 
     const response = await axios.post(
       'https://gate.lava.top/api/v2/invoice',
@@ -301,29 +302,181 @@ app.post('/create-invoice', async (req, res) => {
 });
 
 
-app.post('/lava-webhook', apiKeyMiddleware, async  (req, res) => {
+app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
   try {
-    const webhookData = req.body; // Данные от Lava.top
+    const webhookData = req.body; 
 
     if (webhookData.status === 'completed') {
-      const buyer = webhookData.buyer.email
+      const buyerEmail = webhookData.buyer.email;
 
-      const { data, error } = await supabase
+      // Проверяем, существует ли пользователь
+      const { data: existingUser, error: fetchError } = await supabase
         .from('profiles')
-        .update({ hasSub: true })
-        .eq('email', buyer)
-        .select()
+        .select('email')
+        .eq('email', buyerEmail)
+        .single();
 
-      if (error) throw error;
+      if (fetchError && fetchError.code !== 'PGRST116') { // Ошибка 'PGRST116' означает, что запись не найдена
+        throw fetchError;
+      }
+
+      if (existingUser) {
+        // ✅ Обновляем подписку, если пользователь уже существует
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ hasSub: true })
+          .eq('email', buyerEmail);
+
+        if (updateError) throw updateError;
+      } else {
+        // ✅ Создаем аккаунт, если его еще нет
+        const accountCreationResult = await createAccountAfterPayment(buyerEmail);
+        if (!accountCreationResult.success) {
+          throw new Error(accountCreationResult.error);
+        }
+      }
+
     } else if (webhookData.status === 'failed') {
       console.log(`❌ Платеж ${webhookData.contractId} не прошел.`);
     }
+
     res.status(200).json({ success: true, message: 'Webhook received' });
   } catch (error) {
     console.error('Ошибка обработки вебхука:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
+async function createAccountAfterPayment(to) {
+  const password = uuidv4().slice(0, 10); 
+  const hashedPassword = await bcrypt.hash(password, 10); 
+
+  const { error: insertError } = await supabase
+    .from('profiles')
+    .insert([{ email: to, password: hashedPassword, hasSub: true }]);
+
+  if (insertError) {
+    console.error('Ошибка при создании аккаунта:', insertError.message);
+    return { success: false, error: 'Ошибка при создании аккаунта' };
+  }
+
+  // ✅ Отправляем email с паролем
+  try {
+    const info = await transporter.sendMail({
+      from: `"Neuro Aura" <${process.env.SMTP_USER}>`,
+      to,
+      subject: 'Neuro Aura: Ваш аккаунт создан',
+      html: `
+        <h3>Добро пожаловать в Neuro Aura!</h3>
+        <p>Ваш аккаунт успешно создан.</p>
+        <p>Ваш временный пароль: <strong>${password}</strong></p>
+        <a style="color: #007bff;" href="https://www.neuro-aura.com/app/login?email=${to}">Ссылка на вход</a>
+        <p>Пожалуйста, измените его после первого входа.</p>
+        <p>С уважением,<br>Команда поддержки</p>
+      `,
+    });
+
+    return { success: true, message: 'Аккаунт создан и email отправлен', info };
+  } catch (emailError) {
+    console.error('Ошибка при отправке email:', emailError);
+    return { success: false, error: 'Ошибка при отправке email' };
+  }
+}
+
+app.post("/confirm-email", async (req, res) => {
+  const {code, to} = req.body
+
+  if(!code || !to){
+    return res.status(500).json({ success: false, error: 'Email or Code is required' });
+  }
+
+  try{
+    const { data, error } = await supabase
+      .from("confirmEmail")
+      .select("*")
+      .eq("email", to)
+      .order("created_at", { ascending: false }) // Сортируем от новой к старой
+      .limit(1)
+      .single()
+
+
+    if (error || !data) {
+      return res.status(400).json({ message: "Code not correct or Email not found" });
+    }
+
+    if (data.code === code) {
+      const { error: deleteError } = await supabase
+        .from("confirmEmail")
+        .delete()
+        .eq("email", to);
+
+       return res.status(200).json({ message: "Email confirmed!" });
+    } else {
+      return res.status(400).json({ message: "Not correct code" });
+    }
+  }catch(error){
+    res.status(error.response?.status || 500).json({
+      success: false,
+      error: error.response?.data || error.message
+    });
+  }
+})
+
+app.post("/send-email", async (req, res) => {
+  const { to } = req.body;
+
+  if(!to){
+    return res.status(500).json({ success: false, error: 'Email is required' });
+  }
+
+  function generateCode() {
+    return Math.floor(1000 + Math.random() * 9000);
+  }
+
+  const code = generateCode()
+  
+  const { error: deleteError } = await supabase
+        .from("confirmEmail")
+        .delete()
+        .eq("email", to);
+
+  if (deleteError) {
+      console.error("Ошибка при удалении старых записей:", deleteError.message);
+      return res.status(500).json({ success: false, error: "Ошибка при удалении старых кодов" });
+  }
+
+  const { data, error } = await supabase
+    .from("confirmEmail")
+    .insert([
+        {
+            email: to,
+            code: code
+        }
+    ]);
+
+  if (error) {
+      console.error("Ошибка при добавлении записи:", error.message);
+      res.status(500).json({ success: false, error: 'Ошибка при создания кода' });
+  } 
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Neuro Aura" <${process.env.SMTP_USER}>`, // От кого
+      to, // Кому
+      subject: "Nero Aura: код", // Тема письма
+      html: `<h3>Спасибо за регистрацию.</h3>
+<p>Введите следующий код на сайте для подтверждения:</p>
+<h2 style="color: #007bff;">🔢 Ваш код: <strong>${code}</strong></h2>
+<p>Если вы не запрашивали регистрацию на сайте neuro-aura.com , просто проигнорируйте это сообщение.</p>
+<p>С уважением,<br>Команда поддержки</p>` // Текст письма
+    });
+
+    return res.json({ success: true, message: "Email sent!", info });
+  } catch (error) {
+    console.error("Ошибка при отправке email:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+})
 
 app.post('/lava-webhook-recurrent', apiKeyMiddleware, async  (req, res) => {
   try {

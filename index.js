@@ -327,7 +327,7 @@ app.post('/create-invoice', async (req, res) => {
 
 
 
-app.post('/lava-webhook',  async (req, res) => {
+app.post('/lava-webhook', apiKeyMiddleware,  async (req, res) => {
   try {
     const webhookData = req.body; 
 

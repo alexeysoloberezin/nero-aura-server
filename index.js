@@ -278,7 +278,7 @@ app.post('/create-invoice', async (req, res) => {
     }
 
 
-    let data = { email, offerId, buyerLanguage }
+    let data = { email, offerId, buyerLanguage, currency, paymentMethod }
 
     const response = await axios.post(
       'https://gate.lava.top/api/v2/invoice',

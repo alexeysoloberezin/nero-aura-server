@@ -8,6 +8,7 @@ const nodemailer = require("nodemailer");
 const app = express();
 const { v4: uuidv4 } = require("uuid");
 const uploadRoute = require("./upload");
+const bcrypt = require('bcryptjs');
 
 dotenv.config()
 

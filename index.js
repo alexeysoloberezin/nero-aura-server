@@ -410,6 +410,9 @@ async function createAccountAfterPayment(to) {
         <h3>Добро пожаловать в Neuro Aura!</h3>
         <p>Ваш временный пароль: <strong>${password}</strong></p>
         <p>Пожалуйста, измените его после первого входа.</p>
+        <h2 style="color: #007bff;">
+            <a href="https://www.neuro-aura.com/en/app/login?email=${to}"><strong>Ссылка на авторизацию</strong></a>
+        </h2>
         <p>С уважением,<br>Команда поддержки</p>
       `,
     });

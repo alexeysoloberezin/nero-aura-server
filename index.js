@@ -270,10 +270,12 @@ app.get('/', (req, res) => {
 });
 
 app.post('/create-invoice', async (req, res) => {
+  const ss = 'cbd17b2c-881f-4668-84b2-25612bfbf554'
+  const good = '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae'
   try {
     const { email, currency, paymentMethod } = req.body
     const { offerId, buyerLanguage } = {
-      offerId: '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae',
+      offerId: ss,
       buyerLanguage: 'EN'
     }
 

@@ -271,17 +271,38 @@ app.get('/', (req, res) => {
 });
 
 app.post('/create-invoice', async (req, res) => {
-  const ss = 'cbd17b2c-881f-4668-84b2-25612bfbf554'
-  const good = '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae'
+  const ss = 'cbd17b2c-881f-4668-84b2-25612bfbf554';
+  const good = '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae';
+
   try {
-    const { email, currency, paymentMethod } = req.body
-    const { offerId, buyerLanguage } = {
-      offerId: ss,
-      buyerLanguage: 'EN'
+    const { email, currency, paymentMethod } = req.body;
+
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('email', email)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      throw fetchError;
     }
 
+    // ✅ Если аккаунт уже существует — возвращаем ошибку
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Аккаунт с такой почтой уже существует'
+      });
+    }
 
-    let data = { email, offerId, buyerLanguage, currency, paymentMethod }
+    // ✅ Если аккаунта нет, создаём инвойс
+    const data = {
+      email,
+      offerId: ss,
+      buyerLanguage: 'EN',
+      currency,
+      paymentMethod
+    };
 
     const response = await axios.post(
       'https://gate.lava.top/api/v2/invoice',
@@ -289,7 +310,7 @@ app.post('/create-invoice', async (req, res) => {
       {
         headers: {
           accept: 'application/json',
-          'X-Api-Key': API_KEY, // Используем ключ из .env
+          'X-Api-Key': process.env.API_KEY, // Ключ из .env
           'Content-Type': 'application/json'
         }
       }
@@ -305,7 +326,8 @@ app.post('/create-invoice', async (req, res) => {
 });
 
 
-app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
+
+app.post('/lava-webhook',  async (req, res) => {
   try {
     const webhookData = req.body; 
 
@@ -352,18 +374,33 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
 
 async function createAccountAfterPayment(to) {
   const password = uuidv4().slice(0, 10); 
-  const hashedPassword = await bcrypt.hash(password, 10); 
 
-  const { error: insertError } = await supabase
-    .from('profiles')
-    .insert([{ email: to, password: hashedPassword, hasSub: true }]);
+  // 🔥 Создаём пользователя в Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email: to,
+    password: password
+  });
 
-  if (insertError) {
-    console.error('Ошибка при создании аккаунта:', insertError.message);
-    return { success: false, error: 'Ошибка при создании аккаунта' };
+  if (authError) {
+    console.error('Ошибка при создании аккаунта в Auth:', authError.message);
+    return { success: false, error: 'Ошибка при создании аккаунта в Auth' };
   }
 
-  // ✅ Отправляем email с паролем
+  // Получаем user_id из Auth
+  const userId = authData.user.id;
+
+  // ✅ Создаём запись в таблице profiles
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ hasSub: true })
+    .eq('email', to);
+
+  if (updateError) {
+    console.error('Ошибка при создании профиля в profiles:', updateError.message);
+    return { success: false, error: 'Ошибка при создании профиля' };
+  }
+
+  // 📧 Отправляем email с паролем
   try {
     const info = await transporter.sendMail({
       from: `"Neuro Aura" <${process.env.SMTP_USER}>`,
@@ -371,15 +408,13 @@ async function createAccountAfterPayment(to) {
       subject: 'Neuro Aura: Ваш аккаунт создан',
       html: `
         <h3>Добро пожаловать в Neuro Aura!</h3>
-        <p>Ваш аккаунт успешно создан.</p>
         <p>Ваш временный пароль: <strong>${password}</strong></p>
-        <a style="color: #007bff;" href="https://www.neuro-aura.com/app/login?email=${to}">Ссылка на вход</a>
         <p>Пожалуйста, измените его после первого входа.</p>
         <p>С уважением,<br>Команда поддержки</p>
       `,
     });
 
-    return { success: true, message: 'Аккаунт создан и email отправлен', info };
+    return { success: true, message: 'Аккаунт создан и email отправлен', authData };
   } catch (emailError) {
     console.error('Ошибка при отправке email:', emailError);
     return { success: false, error: 'Ошибка при отправке email' };

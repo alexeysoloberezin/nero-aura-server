@@ -298,7 +298,7 @@ app.post('/create-invoice', async (req, res) => {
     // ✅ Если аккаунта нет, создаём инвойс
     const data = {
       email,
-      offerId: ss,
+      offerId: good,
       buyerLanguage: 'EN',
       currency,
       paymentMethod

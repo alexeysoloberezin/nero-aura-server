@@ -350,7 +350,7 @@ app.post('/create-invoice', async (req, res) => {
   const good = '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae';
 
   try {
-    const { email, currency, paymentMethod } = req.body;
+    const { email, currency, paymentMethod, tariff } = req.body;
 
     const { data: existingUser, error: fetchError } = await supabase
       .from('profiles')
@@ -370,10 +370,16 @@ app.post('/create-invoice', async (req, res) => {
       });
     }
 
+    let id = '2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9'
+
+    if(tariff === 10){
+      id = '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae'
+    }
+
     // ✅ Если аккаунта нет, создаём инвойс
     const data = {
       email,
-      offerId: good,
+      offerId: id,
       buyerLanguage: 'EN',
       currency,
       paymentMethod

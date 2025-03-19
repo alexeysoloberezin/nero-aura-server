@@ -490,7 +490,7 @@ async function createAccountAfterPayment(to) {
         <div class="code-box">${code}</div>
         
         <br/>
-        <a href="https://neuro-aura.com/ru/app/thanks" class="button">Войти на сайт</a>
+        <a href="https://neuro-aura.com/ru/app/thanks?email=${to}" class="button">Войти на сайт</a>
         <p>
         Важно: Для обеспечения безопасности вашего аккаунта настоятельно рекомендуем сменить временный пароль при первом входе.
         </p>

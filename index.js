@@ -258,6 +258,7 @@ app.post("/send-email", async (req, res) => {
         }
         h3 {
             color: #333;
+            font-size: 22px;
         }
         .code-box {
             font-size: 22px;
@@ -274,7 +275,7 @@ app.post("/send-email", async (req, res) => {
         .button {
             display: inline-block;
             background: #00bcbc;
-            color: white;
+            color: white !important;
             text-decoration: none;
             font-size: 18px;
             padding: 12px 24px;
@@ -295,17 +296,17 @@ app.post("/send-email", async (req, res) => {
 <body>
 
     <div class="email-container">
-        <h3>Спасибо за регистрацию.</h3>
-        <p>Введите следующий код на сайте для подтверждения:</p>
+        <h3>Спасибо за оплату.</h3>
+        <p>Ваши данные для авторизации в приложении:</p>
 
         <div class="code-box">${code}</div>
 
-        <p>Или нажмите кнопку ниже для подтверждения:</p>
+        <p>Или нажмите кнопку ниже для входа в аккаунт:</p>
 
-        <a href="https://neuro-aura.com/app/thanks?code=${code}" class="button">Подтвердить регистрацию</a>
+        <a href="https://neuro-aura.com/en/app/thanks?email=${to}" class="button">Войти на сайт</a>
 
         <p class="footer">
-            Если вы не запрашивали регистрацию на сайте <a href="https://neuro-aura.com">neuro-aura.com</a>, просто проигнорируйте это сообщение.<br>
+            Если вы не оплачивпли курс на сайте <a href="https://neuro-aura.com">neuro-aura.com</a>, просто проигнорируйте это сообщение.<br>
             С уважением,<br>Команда поддержки
         </p>
     </div>

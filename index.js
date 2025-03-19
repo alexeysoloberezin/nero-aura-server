@@ -37,12 +37,12 @@ const apiKeyMiddleware = (req, res, next) => {
 
 
 // Middleware
-app.use(cors({
-  origin: 'https://www.neuro-aura.com',  // Разрешённый домен
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true // Если нужно передавать cookies
-}));
-// app.use(cors('*'));
+// app.use(cors({
+//   origin: 'https://www.neuro-aura.com',  // Разрешённый домен
+//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//   credentials: true // Если нужно передавать cookies
+// }));
+app.use(cors('*'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); 
 app.use(uploadRoute);
@@ -234,11 +234,85 @@ app.post("/send-email", async (req, res) => {
       from: `"Neuro Aura" <${process.env.SMTP_USER}>`, // От кого
       to, // Кому
       subject: "Nero Aura: код", // Тема письма
-      html: `<h3>Спасибо за регистрацию.</h3>
-<p>Введите следующий код на сайте для подтверждения:</p>
-<h2 style="color: #007bff;">🔢 Ваш код: <strong>${code}</strong></h2>
-<p>Если вы не запрашивали регистрацию на сайте neuro-aura.com , просто проигнорируйте это сообщение.</p>
-<p>С уважением,<br>Команда поддержки</p>` // Текст письма
+      html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подтверждение регистрации</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            background: #ffffff;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h3 {
+            color: #333;
+        }
+        .code-box {
+            font-size: 22px;
+            font-weight: bold;
+            background: #f0f8ff;
+            border: 2px dashed #007bff;
+            color: #007bff;
+            padding: 10px 20px;
+            display: inline-block;
+            margin: 15px 0;
+            user-select: all; /* Позволяет легко копировать код */
+            border-radius: 5px;
+        }
+        .button {
+            display: inline-block;
+            background: #00bcbc;
+            color: white;
+            text-decoration: none;
+            font-size: 18px;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .button:hover {
+            background: #009999;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="email-container">
+        <h3>Спасибо за регистрацию.</h3>
+        <p>Введите следующий код на сайте для подтверждения:</p>
+
+        <div class="code-box">${code}</div>
+
+        <p>Или нажмите кнопку ниже для подтверждения:</p>
+
+        <a href="https://neuro-aura.com/app/thanks?code=${code}" class="button">Подтвердить регистрацию</a>
+
+        <p class="footer">
+            Если вы не запрашивали регистрацию на сайте <a href="https://neuro-aura.com">neuro-aura.com</a>, просто проигнорируйте это сообщение.<br>
+            С уважением,<br>Команда поддержки
+        </p>
+    </div>
+
+</body>
+</html>
+` // Текст письма
     });
 
     return res.json({ success: true, message: "Email sent!", info });
@@ -406,15 +480,84 @@ async function createAccountAfterPayment(to) {
       from: `"Neuro Aura" <${process.env.SMTP_USER}>`,
       to,
       subject: 'Neuro Aura: Ваш аккаунт создан',
-      html: `
-        <h3>Добро пожаловать в Neuro Aura!</h3>
-        <p>Ваш временный пароль: <strong>${password}</strong></p>
-        <p>Пожалуйста, измените его после первого входа.</p>
-        <h2 style="color: #007bff;">
-            <a href="https://www.neuro-aura.com/en/app/login?email=${to}"><strong>Ссылка на авторизацию</strong></a>
-        </h2>
-        <p>С уважением,<br>Команда поддержки</p>
-      `,
+      html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подтверждение регистрации</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            background: #ffffff;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h3 {
+            color: #333;
+        }
+        .code-box {
+            font-size: 22px;
+            font-weight: bold;
+            background: #f0f8ff;
+            border: 2px dashed #007bff;
+            color: #007bff;
+            padding: 10px 20px;
+            display: inline-block;
+            margin: 15px 0;
+            user-select: all; /* Позволяет легко копировать код */
+            border-radius: 5px;
+        }
+        .button {
+            display: inline-block;
+            background: #00bcbc;
+            color: white !important;
+            text-decoration: none;
+            font-size: 18px;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .button:hover {
+            background: #009999;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="email-container">
+        <h3>Спасибо за оплату, вам создан аккаунт</h3>
+        <p>Ваш пароль для авторизации:</p>
+
+        <div class="code-box">${code}</div>
+
+        <p>Нажмите кнопку ниже для перехода на страницу авторизации:</p>
+
+        <a href="https://neuro-aura.com/app/thanks?code=${code}" class="button">Войти в приложение</a>
+
+        <p class="footer">
+            Если вы не оплачитвали курс на сайте <a href="https://neuro-aura.com">neuro-aura.com</a>, просто проигнорируйте это сообщение.<br>
+            С уважением,<br>Команда поддержки
+        </p>
+    </div>
+</body>
+</html>
+`,
     });
 
     return { success: true, message: 'Аккаунт создан и email отправлен', authData };

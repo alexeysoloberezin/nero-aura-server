@@ -37,12 +37,12 @@ const apiKeyMiddleware = (req, res, next) => {
 
 
 // Middleware
-// app.use(cors({
-//   origin: 'https://www.neuro-aura.com',  // Разрешённый домен
-//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-//   credentials: true // Если нужно передавать cookies
-// }));
-app.use(cors('*'));
+app.use(cors({
+  origin: 'https://www.neuro-aura.com',  // Разрешённый домен
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true // Если нужно передавать cookies
+}));
+// app.use(cors('*'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); 
 app.use(uploadRoute);
@@ -548,7 +548,7 @@ async function createAccountAfterPayment(to) {
 
         <p>Нажмите кнопку ниже для перехода на страницу авторизации:</p>
 
-        <a href="https://neuro-aura.com/app/thanks?code=${code}" class="button">Войти в приложение</a>
+        <a href="https://neuro-aura.com/app/thanks?email=${to}" class="button">Войти в приложение</a>
 
         <p class="footer">
             Если вы не оплачитвали курс на сайте <a href="https://neuro-aura.com">neuro-aura.com</a>, просто проигнорируйте это сообщение.<br>

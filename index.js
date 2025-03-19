@@ -303,7 +303,7 @@ app.post("/send-email", async (req, res) => {
 
         <p>Или нажмите кнопку ниже для входа в аккаунт:</p>
 
-        <a href="https://neuro-aura.com/en/app/thanks?email=${to}" class="button">Войти на сайт</a>
+        <a href="https://neuro-aura.com/ru/app/thanks?email=${to}" class="button">Войти на сайт</a>
 
         <p class="footer">
             Если вы не оплачивпли курс на сайте <a href="https://neuro-aura.com">neuro-aura.com</a>, просто проигнорируйте это сообщение.<br>

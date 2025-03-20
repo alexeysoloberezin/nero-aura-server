@@ -274,7 +274,7 @@ app.post('/create-invoice', async (req, res) => {
   const good = '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae';
 
   try {
-    const {email, currency, paymentMethod, tariff} = req.body;
+    const {email, currency, paymentMethod, tariff, alreadyCreated} = req.body;
 
     const {data: existingUser, error: fetchError} = await supabase
       .from('profiles')

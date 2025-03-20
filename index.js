@@ -286,12 +286,13 @@ app.post('/create-invoice', async (req, res) => {
       throw fetchError;
     }
 
-    // ✅ Если аккаунт уже существует — возвращаем ошибку
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Аккаунт с такой почтой уже существует'
-      });
+    if(!alreadyCreated){
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Аккаунт с такой почтой уже существует'
+        });
+      }
     }
 
     let id = '2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9'

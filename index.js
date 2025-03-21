@@ -338,6 +338,8 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
   try {
     const webhookData = req.body;
 
+    console.log('webhookData', webhookData)
+
     if (webhookData.status === 'completed') {
       const buyerEmail = webhookData.buyer.email;
 
@@ -348,12 +350,7 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
         .eq('email', buyerEmail)
         .single();
 
-      if (fetchError && fetchError.code !== 'PGRST116') { // Ошибка 'PGRST116' означает, что запись не найдена
-        throw fetchError;
-      }
-
       if (existingUser) {
-        // ✅ Обновляем подписку, если пользователь уже существует
         const {error: updateError} = await supabase
           .from('profiles')
           .update({hasSub: true})
@@ -361,7 +358,6 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
 
         if (updateError) throw updateError;
       } else {
-        // ✅ Создаем аккаунт, если его еще нет
         const accountCreationResult = await createAccountAfterPayment(buyerEmail);
         if (!accountCreationResult.success) {
           throw new Error(accountCreationResult.error);

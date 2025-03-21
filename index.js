@@ -309,7 +309,6 @@ app.post('/create-invoice', async (req, res) => {
       currency,
       paymentMethod
     };
-    console.log('data:', data)
 
     const response = await axios.post(
       'https://gate.lava.top/api/v2/invoice',
@@ -323,7 +322,7 @@ app.post('/create-invoice', async (req, res) => {
       }
     );
 
-    console.log('response.data:', response.data)
+
     res.json({success: true, data: response.data});
   } catch (error) {
     res.status(error.response?.status || 500).json({
@@ -486,7 +485,7 @@ async function createAccountAfterPayment(to) {
             Для входа в ваш личный кабинет используйте следующие данные
         </h4>
         <div class="pass">Временный пароль (скопируйте):</div>
-        <div class="code-box">${code}</div>
+        <div class="code-box">${password}</div>
         
         <br/>
         <a href="https://neuro-aura.com/ru/app/thanks?email=${to}" class="button">Войти на сайт</a>

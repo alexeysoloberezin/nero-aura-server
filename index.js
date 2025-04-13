@@ -1,11 +1,11 @@
 const express = require('express');
 const cors = require('cors');
-const {createClient} = require('@supabase/supabase-js');
+const { createClient } = require('@supabase/supabase-js');
 const dotenv = require('dotenv');
 const axios = require('axios')
 const nodemailer = require("nodemailer");
 const app = express();
-const {v4: uuidv4} = require("uuid");
+const { v4: uuidv4 } = require("uuid");
 const uploadRoute = require("./upload");
 const bcrypt = require('bcryptjs');
 
@@ -29,21 +29,29 @@ const apiKeyMiddleware = (req, res, next) => {
   const key = apiKey || apiKeySecond
 
   if (!key || key !== WEBHOOK_SECRET) {
-    return res.status(403).json({error: "Invalid API Key"});
+    return res.status(403).json({ error: "Invalid API Key" });
   }
   next();
 };
 
-
+const allowedOrigins = [
+  'https://www.neuro-aura.com',
+  'https://neroaura-git-development-alexeysoloberezins-projects.vercel.app'
+]
 // Middleware
 app.use(cors({
-  origin: 'https://www.neuro-aura.com',  // Разрешённый домен
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('⛔️ Not allowed by CORS: ' + origin))
+    }
+  },
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true // Если нужно передавать cookies
-}));
-// app.use(cors('*'));
+  credentials: true
+}))
 app.use(express.json());
-app.use(express.urlencoded({extended: true}));
+app.use(express.urlencoded({ extended: true }));
 app.use(uploadRoute);
 app.use("/uploads", express.static("uploads"));
 
@@ -58,20 +66,20 @@ const transporter = nodemailer.createTransport({
 });
 
 app.post("/reset-password-action", async (req, res) => {
-  const {to, token, password, password_repeat} = req.body;
+  const { to, token, password, password_repeat } = req.body;
 
   // 📌 1. Проверяем, переданы ли все параметры
   if (!to || !token || !password || !password_repeat) {
-    return res.status(400).json({success: false, error: "Все поля обязательны!"});
+    return res.status(400).json({ success: false, error: "Все поля обязательны!" });
   }
 
   // 📌 2. Проверяем, совпадают ли пароли
   if (password !== password_repeat) {
-    return res.status(400).json({success: false, error: "Пароли не совпадают!"});
+    return res.status(400).json({ success: false, error: "Пароли не совпадают!" });
   }
 
   // 📌 3. Ищем запись с email + token в resetPassword
-  const {data, error} = await supabase
+  const { data, error } = await supabase
     .from("resetPassword")
     .select("*")
     .eq("email", to)
@@ -79,37 +87,37 @@ app.post("/reset-password-action", async (req, res) => {
     .single();
 
   if (error || !data) {
-    return res.status(400).json({success: false, error: "Неверный токен или email!"});
+    return res.status(400).json({ success: false, error: "Неверный токен или email!" });
   }
 
   // 📌 4. Получаем `id` пользователя из auth.users
-  const {data: users} = await supabase.auth.admin.listUsers();
+  const { data: users } = await supabase.auth.admin.listUsers();
   const user = users?.users.find(u => u.email === to);
 
   if (!user) {
-    return res.status(400).json({success: false, error: "Пользователь не найден!"});
+    return res.status(400).json({ success: false, error: "Пользователь не найден!" });
   }
 
   // 📌 5. Обновляем пароль через Supabase Auth
-  const {error: updateError} = await supabase.auth.admin.updateUserById(user.id, {
+  const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
     password: password
   });
 
   if (updateError) {
-    return res.status(500).json({success: false, error: "Ошибка при обновлении пароля!"});
+    return res.status(500).json({ success: false, error: "Ошибка при обновлении пароля!" });
   }
 
   // 📌 6. Удаляем использованный токен
   await supabase.from("resetPassword").delete().eq("email", to);
 
-  return res.status(200).json({success: true, message: "Пароль успешно изменён!"});
+  return res.status(200).json({ success: true, message: "Пароль успешно изменён!" });
 });
 
 app.post("/reset-password", async (req, res) => {
-  const {to} = req.body;
+  const { to } = req.body;
 
   if (!to) {
-    return res.status(400).json({success: false, error: "Email is required"});
+    return res.status(400).json({ success: false, error: "Email is required" });
   }
 
   const token = uuidv4(); // 📌 Генерируем уникальный токен
@@ -119,13 +127,13 @@ app.post("/reset-password", async (req, res) => {
   await supabase.from("resetPassword").delete().eq("email", to);
 
   // 📌 2. Сохраняем новый токен в Supabase
-  const {error: insertError} = await supabase
+  const { error: insertError } = await supabase
     .from("resetPassword")
-    .insert([{email: to, token}]);
+    .insert([{ email: to, token }]);
 
   if (insertError) {
     console.error("Ошибка при сохранении токена:", insertError.message);
-    return res.status(500).json({success: false, error: "Ошибка при создании токена"});
+    return res.status(500).json({ success: false, error: "Ошибка при создании токена" });
   }
 
   try {
@@ -145,43 +153,43 @@ app.post("/reset-password", async (req, res) => {
           `
     });
 
-    return res.json({success: true, message: "Email sent!", info});
+    return res.json({ success: true, message: "Email sent!", info });
   } catch (error) {
     console.error("Ошибка при отправке email:", error);
-    return res.status(500).json({success: false, error: error.message});
+    return res.status(500).json({ success: false, error: error.message });
   }
 })
 
 app.post("/confirm-email", async (req, res) => {
-  const {code, to} = req.body
+  const { code, to } = req.body
 
   if (!code || !to) {
-    return res.status(500).json({success: false, error: 'Email or Code is required'});
+    return res.status(500).json({ success: false, error: 'Email or Code is required' });
   }
 
   try {
-    const {data, error} = await supabase
+    const { data, error } = await supabase
       .from("confirmEmail")
       .select("*")
       .eq("email", to)
-      .order("created_at", {ascending: false}) // Сортируем от новой к старой
+      .order("created_at", { ascending: false }) // Сортируем от новой к старой
       .limit(1)
       .single()
 
 
     if (error || !data) {
-      return res.status(400).json({message: "Code not correct or Email not found"});
+      return res.status(400).json({ message: "Code not correct or Email not found" });
     }
 
     if (data.code === code) {
-      const {error: deleteError} = await supabase
+      const { error: deleteError } = await supabase
         .from("confirmEmail")
         .delete()
         .eq("email", to);
 
-      return res.status(200).json({message: "Email confirmed!"});
+      return res.status(200).json({ message: "Email confirmed!" });
     } else {
-      return res.status(400).json({message: "Not correct code"});
+      return res.status(400).json({ message: "Not correct code" });
     }
   } catch (error) {
     res.status(error.response?.status || 500).json({
@@ -192,10 +200,10 @@ app.post("/confirm-email", async (req, res) => {
 })
 
 app.post("/send-email", async (req, res) => {
-  const {to} = req.body;
+  const { to } = req.body;
 
   if (!to) {
-    return res.status(500).json({success: false, error: 'Email is required'});
+    return res.status(500).json({ success: false, error: 'Email is required' });
   }
 
   function generateCode() {
@@ -204,17 +212,17 @@ app.post("/send-email", async (req, res) => {
 
   const code = generateCode()
 
-  const {error: deleteError} = await supabase
+  const { error: deleteError } = await supabase
     .from("confirmEmail")
     .delete()
     .eq("email", to);
 
   if (deleteError) {
     console.error("Ошибка при удалении старых записей:", deleteError.message);
-    return res.status(500).json({success: false, error: "Ошибка при удалении старых кодов"});
+    return res.status(500).json({ success: false, error: "Ошибка при удалении старых кодов" });
   }
 
-  const {data, error} = await supabase
+  const { data, error } = await supabase
     .from("confirmEmail")
     .insert([
       {
@@ -225,7 +233,7 @@ app.post("/send-email", async (req, res) => {
 
   if (error) {
     console.error("Ошибка при добавлении записи:", error.message);
-    res.status(500).json({success: false, error: 'Ошибка при создания кода'});
+    res.status(500).json({ success: false, error: 'Ошибка при создания кода' });
   }
 
   try {
@@ -251,14 +259,14 @@ const authMiddleware = async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1]; // Берём токен из заголовка
 
   if (!token) {
-    return res.status(401).json({error: "Нет токена"});
+    return res.status(401).json({ error: "Нет токена" });
   }
 
   // Проверяем токен через Supabase
-  const {data: user, error} = await supabase.auth.getUser(token);
+  const { data: user, error } = await supabase.auth.getUser(token);
 
   if (error || !user) {
-    return res.status(401).json({error: "Неверный токен"});
+    return res.status(401).json({ error: "Неверный токен" });
   }
 
   req.user = user; // Сохраняем данные пользователя в запрос
@@ -274,9 +282,9 @@ app.post('/create-invoice', async (req, res) => {
   const good = '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae';
 
   try {
-    const {email, currency, paymentMethod, tariff, alreadyCreated} = req.body;
+    const { email, currency, paymentMethod, tariff, alreadyCreated } = req.body;
 
-    const {data: existingUser, error: fetchError} = await supabase
+    const { data: existingUser, error: fetchError } = await supabase
       .from('profiles')
       .select('email')
       .eq('email', email)
@@ -286,7 +294,7 @@ app.post('/create-invoice', async (req, res) => {
       throw fetchError;
     }
 
-    if(!alreadyCreated){
+    if (!alreadyCreated) {
       if (existingUser) {
         return res.status(400).json({
           success: false,
@@ -323,7 +331,7 @@ app.post('/create-invoice', async (req, res) => {
     );
 
 
-    res.json({success: true, data: response.data});
+    res.json({ success: true, data: response.data });
   } catch (error) {
     res.status(error.response?.status || 500).json({
       success: false,
@@ -343,16 +351,16 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
       const buyerEmail = webhookData.buyer.email;
 
       // Проверяем, существует ли пользователь
-      const {data: existingUser, error: fetchError} = await supabase
+      const { data: existingUser, error: fetchError } = await supabase
         .from('profiles')
         .select('email')
         .eq('email', buyerEmail)
         .single();
 
       if (existingUser) {
-        const {error: updateError} = await supabase
+        const { error: updateError } = await supabase
           .from('profiles')
-          .update({hasSub: true})
+          .update({ hasSub: true })
           .eq('email', buyerEmail);
 
         if (updateError) throw updateError;
@@ -367,10 +375,10 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
       console.log(`❌ Платеж ${webhookData.contractId} не прошел.`);
     }
 
-    res.status(200).json({success: true, message: 'Webhook received'});
+    res.status(200).json({ success: true, message: 'Webhook received' });
   } catch (error) {
     console.error('Ошибка обработки вебхука:', error);
-    res.status(500).json({success: false, message: 'Internal server error'});
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
@@ -378,28 +386,28 @@ async function createAccountAfterPayment(to) {
   const password = uuidv4().slice(0, 10);
 
   // 🔥 Создаём пользователя в Supabase Auth
-  const {data: authData, error: authError} = await supabase.auth.signUp({
+  const { data: authData, error: authError } = await supabase.auth.signUp({
     email: to,
     password: password
   });
 
   if (authError) {
     console.error('Ошибка при создании аккаунта в Auth:', authError.message);
-    return {success: false, error: 'Ошибка при создании аккаунта в Auth'};
+    return { success: false, error: 'Ошибка при создании аккаунта в Auth' };
   }
 
   // Получаем user_id из Auth
   const userId = authData.user.id;
 
   // ✅ Создаём запись в таблице profiles
-  const {error: updateError} = await supabase
+  const { error: updateError } = await supabase
     .from('profiles')
-    .update({hasSub: true})
+    .update({ hasSub: true })
     .eq('email', to);
 
   if (updateError) {
     console.error('Ошибка при создании профиля в profiles:', updateError.message);
-    return {success: false, error: 'Ошибка при создании профиля'};
+    return { success: false, error: 'Ошибка при создании профиля' };
   }
 
   // 📧 Отправляем email с паролем
@@ -407,7 +415,7 @@ async function createAccountAfterPayment(to) {
     const info = await transporter.sendMail({
       from: `"Neuro Aura" <${process.env.SMTP_USER}>`,
       to,
-      subject: 'Neuro Aura: Ваш аккаунт создан',
+      subject: 'Ваш доступ к курсу –  от Neuro.Aura',
       html: `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -494,8 +502,8 @@ async function createAccountAfterPayment(to) {
         </p>
         <div>
           Если у вас возникнут вопросы или нужна помощь, мы всегда на связи:<br/>
-          📩 Telegram: @neuroauro (https://t.me/neuroauro)<br/>
-          📷 Instagram: @neuro.auro (https://www.instagram.com/neuro.auro/)
+          📩 Telegram: <a href="https://t.me/neuroauro">@neuroauro</a><br/>
+          📷 Instagram: <a href="https://www.instagram.com/neuro.auro/">@neuro.auro</a> 
         </div>
 
 
@@ -511,10 +519,10 @@ async function createAccountAfterPayment(to) {
 `,
     });
 
-    return {success: true, message: 'Аккаунт создан и email отправлен', authData};
+    return { success: true, message: 'Аккаунт создан и email отправлен', authData };
   } catch (emailError) {
     console.error('Ошибка при отправке email:', emailError);
-    return {success: false, error: 'Ошибка при отправке email'};
+    return { success: false, error: 'Ошибка при отправке email' };
   }
 }
 
@@ -628,43 +636,43 @@ app.post('/check-email', async (req, res) => {
 `,
     });
 
-    res.status(200).json({success: true, message: 'Webhook received'});
+    res.status(200).json({ success: true, message: 'Webhook received' });
   } catch (emailError) {
     console.error('Ошибка при отправке email:', emailError);
-    res.status(200).json({success: true, message: 'Webhook received'});
+    res.status(200).json({ success: true, message: 'Webhook received' });
   }
 })
 
 app.post("/confirm-email", async (req, res) => {
-  const {code, to} = req.body
+  const { code, to } = req.body
 
   if (!code || !to) {
-    return res.status(500).json({success: false, error: 'Email or Code is required'});
+    return res.status(500).json({ success: false, error: 'Email or Code is required' });
   }
 
   try {
-    const {data, error} = await supabase
+    const { data, error } = await supabase
       .from("confirmEmail")
       .select("*")
       .eq("email", to)
-      .order("created_at", {ascending: false}) // Сортируем от новой к старой
+      .order("created_at", { ascending: false }) // Сортируем от новой к старой
       .limit(1)
       .single()
 
 
     if (error || !data) {
-      return res.status(400).json({message: "Code not correct or Email not found"});
+      return res.status(400).json({ message: "Code not correct or Email not found" });
     }
 
     if (data.code === code) {
-      const {error: deleteError} = await supabase
+      const { error: deleteError } = await supabase
         .from("confirmEmail")
         .delete()
         .eq("email", to);
 
-      return res.status(200).json({message: "Email confirmed!"});
+      return res.status(200).json({ message: "Email confirmed!" });
     } else {
-      return res.status(400).json({message: "Not correct code"});
+      return res.status(400).json({ message: "Not correct code" });
     }
   } catch (error) {
     res.status(error.response?.status || 500).json({
@@ -675,10 +683,10 @@ app.post("/confirm-email", async (req, res) => {
 })
 
 app.post("/send-email", async (req, res) => {
-  const {to} = req.body;
+  const { to } = req.body;
 
   if (!to) {
-    return res.status(500).json({success: false, error: 'Email is required'});
+    return res.status(500).json({ success: false, error: 'Email is required' });
   }
 
   function generateCode() {
@@ -687,17 +695,17 @@ app.post("/send-email", async (req, res) => {
 
   const code = generateCode()
 
-  const {error: deleteError} = await supabase
+  const { error: deleteError } = await supabase
     .from("confirmEmail")
     .delete()
     .eq("email", to);
 
   if (deleteError) {
     console.error("Ошибка при удалении старых записей:", deleteError.message);
-    return res.status(500).json({success: false, error: "Ошибка при удалении старых кодов"});
+    return res.status(500).json({ success: false, error: "Ошибка при удалении старых кодов" });
   }
 
-  const {data, error} = await supabase
+  const { data, error } = await supabase
     .from("confirmEmail")
     .insert([
       {
@@ -708,7 +716,7 @@ app.post("/send-email", async (req, res) => {
 
   if (error) {
     console.error("Ошибка при добавлении записи:", error.message);
-    res.status(500).json({success: false, error: 'Ошибка при создания кода'});
+    res.status(500).json({ success: false, error: 'Ошибка при создания кода' });
   }
 
   try {
@@ -723,10 +731,10 @@ app.post("/send-email", async (req, res) => {
 <p>С уважением,<br>Команда поддержки</p>` // Текст письма
     });
 
-    return res.json({success: true, message: "Email sent!", info});
+    return res.json({ success: true, message: "Email sent!", info });
   } catch (error) {
     console.error("Ошибка при отправке email:", error);
-    return res.status(500).json({success: false, error: error.message});
+    return res.status(500).json({ success: false, error: error.message });
   }
 })
 
@@ -737,9 +745,9 @@ app.post('/lava-webhook-recurrent', apiKeyMiddleware, async (req, res) => {
     if (webhookData.status === 'completed') {
       const buyer = webhookData.buyer.email
 
-      const {data, error} = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .update({hasSub: true})
+        .update({ hasSub: true })
         .eq('email', buyer)
         .select()
 
@@ -747,10 +755,10 @@ app.post('/lava-webhook-recurrent', apiKeyMiddleware, async (req, res) => {
     } else if (webhookData.status === 'failed') {
       console.log(`❌ Платеж ${webhookData.contractId} не прошел.`);
     }
-    res.status(200).json({success: true, message: 'Webhook received'});
+    res.status(200).json({ success: true, message: 'Webhook received' });
   } catch (error) {
     console.error('Ошибка обработки вебхука:', error);
-    res.status(500).json({success: false, message: 'Internal server error'});
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
@@ -768,7 +776,7 @@ app.get('/get-products', async (req, res) => {
       }
     );
 
-    res.json({success: true, data: response.data});
+    res.json({ success: true, data: response.data });
   } catch (error) {
     res.status(error.response?.status || 500).json({
       success: false,

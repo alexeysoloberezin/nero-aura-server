@@ -50,6 +50,11 @@ app.use(cors({
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true
 }))
+// app.use(cors({
+//   origin: '*',
+//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//   credentials: true
+// }))
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(uploadRoute);
@@ -112,6 +117,102 @@ app.post("/reset-password-action", async (req, res) => {
 
   return res.status(200).json({ success: true, message: "Пароль успешно изменён!" });
 });
+
+// app.post('/get-lessons', async (req, res) => {
+//   const { token, courseId, lessonId } = req.body
+
+//   if (!token || !courseId || !lessonId) return res.json({ message: 'Ошибка' })
+
+//   const { data: user, error } = await supabase.auth.getUser(token)
+
+//   // обработка ошибка
+//   const { data: existingUser, error: fetchError } = await supabase
+//     .from('profiles')
+//     .select('*')
+//     .eq('email', user.user.email)
+//     .single();
+
+//   let giveAccess = false
+
+//   if (!existingUser.available_courses.includes(courseId)) {
+//     return res.status(400).json({ message: 'Курс не куплен' })
+//   }
+
+//   const ids = {
+//     '1': 'free_lessons',
+//     '2': 'free_lessons',
+//     '3': 'photosession',
+//     '4': 'photosession',
+//   }
+
+//   const { data, status } = await supabase
+//     .from(ids[courseId])
+//     .select('*')
+//     .eq('id', lessonId)
+//     .single();
+
+//   if (error) {
+//     throw new Error(error.message); // Явно выбрасываем ошибку
+//   }
+
+//   return res.json(data);
+// })
+
+
+const ids = {
+  '1': 'free_lessons',
+  '2': 'free_lessons',
+  '3': 'photosession',
+  '4': 'photosession',
+}
+
+app.post('/get-lessons', async (req, res) => {
+  const { courseId, lessonId } = req.body
+
+  const { data, error } = await supabase
+    .from(ids[courseId])
+    .select('id, title, title_en')
+    .order('id')
+
+  console.log('data', data)
+
+  if (error) {
+    throw new Error(error.message); // Явно выбрасываем ошибку
+  }
+
+  return res.json(data);
+})
+
+app.post('/get-lesson', async (req, res) => {
+  const { token, courseId, lessonId } = req.body
+
+  if (!token || !courseId || !lessonId) return res.json({ message: 'Ошибка' })
+
+  const { data: user, error } = await supabase.auth.getUser(token)
+
+  // обработка ошибка
+  const { data: existingUser, error: fetchError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('email', user.user.email)
+    .single();
+
+  if (!existingUser.available_courses.includes(courseId)) {
+    return res.status(400).json({ message: 'Курс не куплен' })
+  }
+
+  const { data, status } = await supabase
+    .from(ids[courseId])
+    .select('*')
+    .eq('id', lessonId)
+    .single();
+
+  if (error) {
+    throw new Error(error.message); // Явно выбрасываем ошибку
+  }
+
+  return res.json(data);
+})
 
 app.post("/reset-password", async (req, res) => {
   const { to } = req.body;
@@ -277,42 +378,74 @@ app.get('/', (req, res) => {
   res.send('ALL работает!');
 });
 
-app.post('/create-invoice', async (req, res) => {
-  const ss = 'cbd17b2c-881f-4668-84b2-25612bfbf554';
-  const good = '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae';
+app.post('/notifications-count', async (req, res) => {
+  const { user_id } = req.body;
 
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
+  }
+
+  const { data: homeworks, error: homeworksError } = await supabase
+    .from("homeworks")
+    .select("id, lesson_id, messages")
+    .eq("user_id", user_id)
+    .eq('readLastMessage', false)
+
+  if (homeworksError) {
+    console.error(homeworksError);
+    return res.status(500).json({ error: 'Ошибка при получении homeworks' });
+  }
+
+  return res.json({ needAnswer: homeworks.length });
+});
+
+app.post('/notifications', async (req, res) => {
+  const { user_id } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ error: 'user_id is required' });
+  }
+
+  const { data: homeworks, error: homeworksError } = await supabase
+    .from("homeworks")
+    .select("id, lesson_id, messages")
+    .eq("user_id", user_id)
+    .eq('readLastMessage', false)
+
+  if (homeworksError) {
+    console.error(homeworksError);
+    return res.status(500).json({ error: 'Ошибка при получении homeworks' });
+  }
+
+  return res.json(homeworks);
+});
+
+app.post('/create-invoice', async (req, res) => {
   try {
     const { email, currency, paymentMethod, tariff, alreadyCreated } = req.body;
 
+    // TODO
     const { data: existingUser, error: fetchError } = await supabase
       .from('profiles')
-      .select('email')
+      .select('*')
       .eq('email', email)
       .single();
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      throw fetchError;
+    if (fetchError) {
+      return res.status(500).json({ message: 'Ошибка при проверке профиля' })
     }
 
-    if (!alreadyCreated) {
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: 'Аккаунт с такой почтой уже существует'
-        });
-      }
+    if (existingUser.available_courses.includes(tariff.id)) {
+      return res
+        .status(400)
+        .json({ message: 'Вы уже приобрели этот курс' })
     }
 
-    let id = '2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9'
-
-    if (tariff === 10) {
-      id = '9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae'
-    }
-
+    // return res.json({ existingUser, tariff, hasCourse: 'no' })
     // ✅ Если аккаунта нет, создаём инвойс
     const data = {
       email,
-      offerId: id,
+      offerId: tariff.tarrif_id,
       buyerLanguage: 'EN',
       currency,
       paymentMethod
@@ -353,19 +486,35 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
       // Проверяем, существует ли пользователь
       const { data: existingUser, error: fetchError } = await supabase
         .from('profiles')
-        .select('email')
+        .select('*')
         .eq('email', buyerEmail)
         .single();
 
-      if (existingUser) {
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ hasSub: true })
-          .eq('email', buyerEmail);
+      const { data: tariffData, error: sbError } = await supabase
+        .from("courses_tariffs")
+        .select("*")
+        .eq("tarrif_id", webhookData.product.id)
+        .single()
 
-        if (updateError) throw updateError;
+      let courseToAdd = tariffData.id + ''
+
+      if (existingUser) {
+        const courses = existingUser.available_courses || []
+
+        if (!courses.includes(courseToAdd)) {
+          courses.push(courseToAdd)
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ available_courses: courses })
+            .eq('email', buyerEmail)
+
+          if (updateError) {
+            console.error('Ошибка обновления available_courses:', updateError)
+            return res.status(500).json({ message: 'Не удалось обновить курсы' })
+          }
+        }
       } else {
-        const accountCreationResult = await createAccountAfterPayment(buyerEmail);
+        const accountCreationResult = await createAccountAfterPayment(buyerEmail, courseToAdd);
         if (!accountCreationResult.success) {
           throw new Error(accountCreationResult.error);
         }
@@ -382,7 +531,7 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
   }
 });
 
-async function createAccountAfterPayment(to) {
+async function createAccountAfterPayment(to, courseToAdd) {
   const password = uuidv4().slice(0, 10);
 
   // 🔥 Создаём пользователя в Supabase Auth
@@ -402,7 +551,7 @@ async function createAccountAfterPayment(to) {
   // ✅ Создаём запись в таблице profiles
   const { error: updateError } = await supabase
     .from('profiles')
-    .update({ hasSub: true })
+    .update({ available_courses: [courseToAdd] })
     .eq('email', to);
 
   if (updateError) {

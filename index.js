@@ -429,13 +429,13 @@ app.post('/create-invoice', async (req, res) => {
       .from('profiles')
       .select('*')
       .eq('email', email)
-      .single();
+      .maybeSingle();
 
     if (fetchError) {
       return res.status(500).json({ message: 'Ошибка при проверке профиля' })
     }
 
-    if (existingUser.available_courses.includes(tariff.id)) {
+    if (existingUser && existingUser.available_courses.includes(tariff.id)) {
       return res
         .status(400)
         .json({ message: 'Вы уже приобрели этот курс' })

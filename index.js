@@ -7,7 +7,6 @@ const nodemailer = require("nodemailer");
 const app = express();
 const { v4: uuidv4 } = require("uuid");
 const uploadRoute = require("./upload");
-const bcrypt = require('bcryptjs');
 
 dotenv.config()
 
@@ -118,47 +117,6 @@ app.post("/reset-password-action", async (req, res) => {
   return res.status(200).json({ success: true, message: "Пароль успешно изменён!" });
 });
 
-// app.post('/get-lessons', async (req, res) => {
-//   const { token, courseId, lessonId } = req.body
-
-//   if (!token || !courseId || !lessonId) return res.json({ message: 'Ошибка' })
-
-//   const { data: user, error } = await supabase.auth.getUser(token)
-
-//   // обработка ошибка
-//   const { data: existingUser, error: fetchError } = await supabase
-//     .from('profiles')
-//     .select('*')
-//     .eq('email', user.user.email)
-//     .single();
-
-//   let giveAccess = false
-
-//   if (!existingUser.available_courses.includes(courseId)) {
-//     return res.status(400).json({ message: 'Курс не куплен' })
-//   }
-
-//   const ids = {
-//     '1': 'free_lessons',
-//     '2': 'free_lessons',
-//     '3': 'photosession',
-//     '4': 'photosession',
-//   }
-
-//   const { data, status } = await supabase
-//     .from(ids[courseId])
-//     .select('*')
-//     .eq('id', lessonId)
-//     .single();
-
-//   if (error) {
-//     throw new Error(error.message); // Явно выбрасываем ошибку
-//   }
-
-//   return res.json(data);
-// })
-
-
 const ids = {
   '1': 'free_lessons',
   '2': 'free_lessons',
@@ -174,10 +132,8 @@ app.post('/get-lessons', async (req, res) => {
     .select('id, title, title_en')
     .order('id')
 
-  console.log('data', data)
-
   if (error) {
-    throw new Error(error.message); // Явно выбрасываем ошибку
+    return res.status(500).json({ error: error.message }); // Явно выбрасываем ошибку
   }
 
   return res.json(data);
@@ -208,7 +164,7 @@ app.post('/get-lesson', async (req, res) => {
     .single();
 
   if (error) {
-    throw new Error(error.message); // Явно выбрасываем ошибку
+    return res.status(500).json({ error: error.message }); // Явно выбрасываем ошибку
   }
 
   return res.json(data);
@@ -496,6 +452,14 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
         .eq("tarrif_id", webhookData.product.id)
         .single()
 
+      console.log("TARIFF:", tariffData)
+
+
+      if (!tariffData) {
+        console.error('Тариф не найден в courses_tariffs по ID:', webhookData.product.id)
+        return res.status(400).json({ error: 'Тариф не найден' })
+      }
+
       let courseToAdd = tariffData.id + ''
 
       if (existingUser) {
@@ -516,7 +480,7 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
       } else {
         const accountCreationResult = await createAccountAfterPayment(buyerEmail, courseToAdd);
         if (!accountCreationResult.success) {
-          throw new Error(accountCreationResult.error);
+          return res.status(500).json({ error: accountCreationResult.error });
         }
       }
 
@@ -900,7 +864,7 @@ app.post('/lava-webhook-recurrent', apiKeyMiddleware, async (req, res) => {
         .eq('email', buyer)
         .select()
 
-      if (error) throw error;
+      if (error) return res.status(500).json({ error: error.message });;
     } else if (webhookData.status === 'failed') {
       console.log(`❌ Платеж ${webhookData.contractId} не прошел.`);
     }
@@ -912,7 +876,6 @@ app.post('/lava-webhook-recurrent', apiKeyMiddleware, async (req, res) => {
 });
 
 app.get('/get-products', async (req, res) => {
-  console.log('get prods')
   try {
     const response = await axios.get(
       'https://gate.lava.top/api/v2/products',
@@ -935,7 +898,6 @@ app.get('/get-products', async (req, res) => {
 });
 
 
-// Запуск сервера
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
   console.log('API_KEY:', API_KEY)

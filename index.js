@@ -407,6 +407,8 @@ app.post('/create-invoice', async (req, res) => {
       paymentMethod
     };
 
+    console.log('create-invoce for tariff_id:', tariff.tariff_id)
+
     const response = await axios.post(
       'https://gate.lava.top/api/v2/invoice',
       data,
@@ -446,14 +448,14 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
         .eq('email', buyerEmail)
         .single();
 
-      const { data: tariffData, error: sbError } = await supabase
-        .from("courses_tariffs")
-        .select("*")
-        .eq("tarrif_id", webhookData.product.id)
-        .single()
+      const listTarrifsByAmount = {
+        "10": "9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae",
+        "15": "2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9",
+        "19": "359a02c8-1ea3-4118-ac51-0b7d5d6e0463",
+        "39": "f45d2bf2-19f0-472b-ac81-5567d53322e8"
+      }
 
-      console.log("TARIFF:", tariffData)
-
+      const tariffData = listTarrifsByAmount?.[webhookData.amount]
 
       if (!tariffData) {
         console.error('Тариф не найден в courses_tariffs по ID:', webhookData.product.id)
@@ -494,6 +496,7 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 async function createAccountAfterPayment(to, courseToAdd) {
   const password = uuidv4().slice(0, 10);

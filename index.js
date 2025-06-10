@@ -431,6 +431,24 @@ app.post('/create-invoice', async (req, res) => {
   }
 });
 
+const listTarrifsByAmount = {
+  "10": {
+    tariff_id: "9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae",
+    course_id: "1"
+  },
+  "15": {
+    tariff_id: "2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9",
+    course_id: "2"
+  },
+  "19": {
+    tariff_id: "359a02c8-1ea3-4118-ac51-0b7d5d6e0463",
+    course_id: "3"
+  },
+  "39": {
+    tariff_id: "f45d2bf2-19f0-472b-ac81-5567d53322e8",
+    course_id: "4"
+  }
+}
 
 app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
   try {
@@ -448,21 +466,15 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
         .eq('email', buyerEmail)
         .single();
 
-      const listTarrifsByAmount = {
-        "10": "9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae",
-        "15": "2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9",
-        "19": "359a02c8-1ea3-4118-ac51-0b7d5d6e0463",
-        "39": "f45d2bf2-19f0-472b-ac81-5567d53322e8"
-      }
-
-      const tariffData = listTarrifsByAmount?.[webhookData.amount]
+      const amount = webhookData.amount + ''
+      const tariffData = listTarrifsByAmount?.[amount]
 
       if (!tariffData) {
-        console.error('Тариф не найден в courses_tariffs по ID:', webhookData.product.id)
+        console.error('Тариф не найден в courses_tariffs по amount:', tariffData)
         return res.status(400).json({ error: 'Тариф не найден' })
       }
 
-      let courseToAdd = tariffData.id + ''
+      let courseToAdd = tariffData.course_id
 
       if (existingUser) {
         const courses = existingUser.available_courses || []

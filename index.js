@@ -83,38 +83,42 @@ app.post("/reset-password-action", async (req, res) => {
   }
 
   // 📌 3. Ищем запись с email + token в resetPassword
-  const { data, error } = await supabase
+  try{
+    const { data, error } = await supabase
     .from("resetPassword")
     .select("*")
     .eq("email", to)
     .eq("token", token)
     .single();
 
-  if (error || !data) {
-    return res.status(400).json({ success: false, error: "Неверный токен или email!" });
+    if (error || !data) {
+      return res.status(400).json({ success: false, error: "Неверный токен или email!" });
+    }
+
+    // 📌 4. Получаем `id` пользователя из auth.users
+    const { data: users } = await supabase.auth.admin.listUsers();
+    const user = users?.users.find(u => u.email === to);
+
+    if (!user) {
+      return res.status(400).json({ success: false, error: "Пользователь не найден!" });
+    }
+
+    // 📌 5. Обновляем пароль через Supabase Auth
+    const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
+      password: password
+    });
+
+    if (updateError) {
+      return res.status(500).json({ success: false, error: "Ошибка при обновлении пароля!" });
+    }
+
+    // 📌 6. Удаляем использованный токен
+    await supabase.from("resetPassword").delete().eq("email", to);
+
+    return res.status(200).json({ success: true, message: "Пароль успешно изменён!" });
+  }catch (err){
+    res.status(500).json({ success: false, error: err.message });
   }
-
-  // 📌 4. Получаем `id` пользователя из auth.users
-  const { data: users } = await supabase.auth.admin.listUsers();
-  const user = users?.users.find(u => u.email === to);
-
-  if (!user) {
-    return res.status(400).json({ success: false, error: "Пользователь не найден!" });
-  }
-
-  // 📌 5. Обновляем пароль через Supabase Auth
-  const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
-    password: password
-  });
-
-  if (updateError) {
-    return res.status(500).json({ success: false, error: "Ошибка при обновлении пароля!" });
-  }
-
-  // 📌 6. Удаляем использованный токен
-  await supabase.from("resetPassword").delete().eq("email", to);
-
-  return res.status(200).json({ success: true, message: "Пароль успешно изменён!" });
 });
 
 const ids = {
@@ -127,55 +131,57 @@ const ids = {
 app.post('/get-lessons', async (req, res) => {
   const { courseId, lessonId } = req.body
 
-  const { data, error } = await supabase
+  try{
+    const { data, error } = await supabase
     .from(ids[courseId])
     .select('id, title, title_en')
     .order('id')
 
-  if (error) {
-    return res.status(500).json({ error: error.message }); // Явно выбрасываем ошибку
-  }
+    if (error) {
+      return res.status(500).json({ error: error.message }); // Явно выбрасываем ошибку
+    }
 
-  return res.json(data);
+    return res.json(data);
+  }catch (err){
+    res.status(500).json({ success: false, error: err.message });
+  }
 })
 
 app.post('/get-lesson', async (req, res) => {
   const { token, courseId, lessonId } = req.body
 
-  console.log('get-lesson', req.body)
 
   if (!token || !courseId || !lessonId) return res.json({ message: 'Ошибка' })
 
-  const { data: user, error } = await supabase.auth.getUser(token)
+  try{
+    const { data: user, error } = await supabase.auth.getUser(token)
 
-  console.log('get-lesson-user', user)
-
-  // обработка ошибка
-  const { data: existingUser, error: fetchError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('email', user.user.email)
-    .single();
-
-  console.log('get-lesson-existingUser', existingUser)
-
-  if (!existingUser.available_courses.includes(courseId)) {
-    console.log('get-lesson-error', error)
-    return res.status(400).json({ message: 'Курс не куплен' })
+    // обработка ошибка
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', user.user.email)
+      .single();
+  
+  
+    if (!existingUser.available_courses.includes(courseId)) {
+      return res.status(400).json({ message: 'Курс не куплен' })
+    }
+  
+    const { data, status } = await supabase
+      .from(ids[courseId])
+      .select('*')
+      .eq('id', lessonId)
+      .single();
+  
+    if (error) {
+      return res.status(500).json({ error: error.message }); // Явно выбрасываем ошибку
+    }
+  
+    return res.json(data);
+  }catch (err){
+    res.status(500).json({ success: false, error: err.message });
   }
-
-  const { data, status } = await supabase
-    .from(ids[courseId])
-    .select('*')
-    .eq('id', lessonId)
-    .single();
-
-  console.log('get-lesson-data', data)
-  if (error) {
-    return res.status(500).json({ error: error.message }); // Явно выбрасываем ошибку
-  }
-
-  return res.json(data);
 })
 
 app.post("/reset-password", async (req, res) => {
@@ -185,43 +191,47 @@ app.post("/reset-password", async (req, res) => {
     return res.status(400).json({ success: false, error: "Email is required" });
   }
 
-  const token = uuidv4(); // 📌 Генерируем уникальный токен
-  const resetLink = `https://www.neuro-aura.com/app/resetPassword?email=${to}&token=${token}`;
-
-  // 📌 1. Удаляем старые токены, если они есть
-  await supabase.from("resetPassword").delete().eq("email", to);
-
-  // 📌 2. Сохраняем новый токен в Supabase
-  const { error: insertError } = await supabase
-    .from("resetPassword")
-    .insert([{ email: to, token }]);
-
-  if (insertError) {
-    console.error("Ошибка при сохранении токена:", insertError.message);
-    return res.status(500).json({ success: false, error: "Ошибка при создании токена" });
-  }
-
-  try {
-    // 📌 3. Отправляем email со ссылкой
-    const info = await transporter.sendMail({
-      from: `"Neuro Aura" <${process.env.SMTP_USER}>`,
-      to,
-      subject: "Neuro Aura: Сброс пароля",
-      html: `
-              <h3>Сброс пароля</h3>
-              <p>Перейдите по ссылке для сброса пароля:</p>
-              <h2 style="color: #007bff;">
-                  <a href="${resetLink}"><strong>Сбросить пароль</strong></a>
-              </h2>
-              <p>Если вы не запрашивали сброс пароля на сайте neuro-aura.com, просто проигнорируйте это сообщение.</p>
-              <p>С уважением,<br>Команда поддержки</p>
-          `
-    });
-
-    return res.json({ success: true, message: "Email sent!", info });
-  } catch (error) {
-    console.error("Ошибка при отправке email:", error);
-    return res.status(500).json({ success: false, error: error.message });
+  try{
+    const token = uuidv4(); // 📌 Генерируем уникальный токен
+    const resetLink = `https://www.neuro-aura.com/app/resetPassword?email=${to}&token=${token}`;
+  
+    // 📌 1. Удаляем старые токены, если они есть
+    await supabase.from("resetPassword").delete().eq("email", to);
+  
+    // 📌 2. Сохраняем новый токен в Supabase
+    const { error: insertError } = await supabase
+      .from("resetPassword")
+      .insert([{ email: to, token }]);
+  
+    if (insertError) {
+      console.error("Ошибка при сохранении токена:", insertError.message);
+      return res.status(500).json({ success: false, error: "Ошибка при создании токена" });
+    }
+  
+    try {
+      // 📌 3. Отправляем email со ссылкой
+      const info = await transporter.sendMail({
+        from: `"Neuro Aura" <${process.env.SMTP_USER}>`,
+        to,
+        subject: "Neuro Aura: Сброс пароля",
+        html: `
+                <h3>Сброс пароля</h3>
+                <p>Перейдите по ссылке для сброса пароля:</p>
+                <h2 style="color: #007bff;">
+                    <a href="${resetLink}"><strong>Сбросить пароль</strong></a>
+                </h2>
+                <p>Если вы не запрашивали сброс пароля на сайте neuro-aura.com, просто проигнорируйте это сообщение.</p>
+                <p>С уважением,<br>Команда поддержки</p>
+            `
+      });
+  
+      return res.json({ success: true, message: "Email sent!", info });
+    } catch (error) {
+      console.error("Ошибка при отправке email:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }catch (err){
+    res.status(500).json({ success: false, error: err.message });
   }
 })
 
@@ -265,58 +275,62 @@ app.post("/confirm-email", async (req, res) => {
 })
 
 app.post("/send-email", async (req, res) => {
-  const { to } = req.body;
-
-  if (!to) {
-    return res.status(500).json({ success: false, error: 'Email is required' });
-  }
-
-  function generateCode() {
-    return Math.floor(1000 + Math.random() * 9000);
-  }
-
-  const code = generateCode()
-
-  const { error: deleteError } = await supabase
-    .from("confirmEmail")
-    .delete()
-    .eq("email", to);
-
-  if (deleteError) {
-    console.error("Ошибка при удалении старых записей:", deleteError.message);
-    return res.status(500).json({ success: false, error: "Ошибка при удалении старых кодов" });
-  }
-
-  const { data, error } = await supabase
-    .from("confirmEmail")
-    .insert([
-      {
-        email: to,
-        code: code
-      }
-    ]);
-
-  if (error) {
-    console.error("Ошибка при добавлении записи:", error.message);
-    res.status(500).json({ success: false, error: 'Ошибка при создания кода' });
-  }
-
   try {
-    const info = await transporter.sendMail({
-      from: `"Neuro Aura" <${process.env.SMTP_USER}>`, // От кого
-      to, // Кому
-      subject: "Nero Aura: код", // Тема письма
-      html: `<h3>Спасибо за регистрацию.</h3>
-<p>Введите следующий код на сайте для подтверждения:</p>
-<h2 style="color: #007bff;">🔢 Ваш код: <strong>${code}</strong></h2>
-<p>Если вы не запрашивали регистрацию на сайте neuro-aura.com , просто проигнорируйте это сообщение.</p>
-<p>С уважением,<br>Команда поддержки</p>` // Текст письма
-    });
+    const { to } = req.body;
 
-    return res.json({ success: true, message: "Email sent!", info });
-  } catch (error) {
-    console.error("Ошибка при отправке email:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    if (!to) {
+      return res.status(500).json({ success: false, error: 'Email is required' });
+    }
+  
+    function generateCode() {
+      return Math.floor(1000 + Math.random() * 9000);
+    }
+  
+    const code = generateCode()
+  
+    const { error: deleteError } = await supabase
+      .from("confirmEmail")
+      .delete()
+      .eq("email", to);
+  
+    if (deleteError) {
+      console.error("Ошибка при удалении старых записей:", deleteError.message);
+      return res.status(500).json({ success: false, error: "Ошибка при удалении старых кодов" });
+    }
+  
+    const { data, error } = await supabase
+      .from("confirmEmail")
+      .insert([
+        {
+          email: to,
+          code: code
+        }
+      ]);
+  
+    if (error) {
+      console.error("Ошибка при добавлении записи:", error.message);
+      res.status(500).json({ success: false, error: 'Ошибка при создания кода' });
+    }
+  
+    try {
+      const info = await transporter.sendMail({
+        from: `"Neuro Aura" <${process.env.SMTP_USER}>`, // От кого
+        to, // Кому
+        subject: "Nero Aura: код", // Тема письма
+        html: `<h3>Спасибо за регистрацию.</h3>
+  <p>Введите следующий код на сайте для подтверждения:</p>
+  <h2 style="color: #007bff;">🔢 Ваш код: <strong>${code}</strong></h2>
+  <p>Если вы не запрашивали регистрацию на сайте neuro-aura.com , просто проигнорируйте это сообщение.</p>
+  <p>С уважением,<br>Команда поддержки</p>` // Текст письма
+      });
+  
+      return res.json({ success: true, message: "Email sent!", info });
+    } catch (error) {
+      console.error("Ошибка при отправке email:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }catch (err){
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -343,45 +357,53 @@ app.get('/', (req, res) => {
 });
 
 app.post('/notifications-count', async (req, res) => {
-  const { user_id } = req.body;
+  try{
+    const { user_id } = req.body;
 
-  if (!user_id) {
-    return res.status(400).json({ error: 'user_id is required' });
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    const { data: homeworks, error: homeworksError } = await supabase
+      .from("homeworks")
+      .select("id, lesson_id, messages")
+      .eq("user_id", user_id)
+      .eq('readLastMessage', false)
+
+    if (homeworksError) {
+      console.error(homeworksError);
+      return res.status(500).json({ error: 'Ошибка при получении homeworks' });
+    }
+
+    return res.json({ needAnswer: homeworks.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
-
-  const { data: homeworks, error: homeworksError } = await supabase
-    .from("homeworks")
-    .select("id, lesson_id, messages")
-    .eq("user_id", user_id)
-    .eq('readLastMessage', false)
-
-  if (homeworksError) {
-    console.error(homeworksError);
-    return res.status(500).json({ error: 'Ошибка при получении homeworks' });
-  }
-
-  return res.json({ needAnswer: homeworks.length });
 });
 
 app.post('/notifications', async (req, res) => {
-  const { user_id } = req.body;
+  try{
+    const { user_id } = req.body;
 
-  if (!user_id) {
-    return res.status(400).json({ error: 'user_id is required' });
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+  
+    const { data: homeworks, error: homeworksError } = await supabase
+      .from("homeworks")
+      .select("id, lesson_id, messages")
+      .eq("user_id", user_id)
+      .eq('readLastMessage', false)
+  
+    if (homeworksError) {
+      console.error(homeworksError);
+      return res.status(500).json({ error: 'Ошибка при получении homeworks' });
+    }
+  
+    return res.json(homeworks);
+  }catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
-
-  const { data: homeworks, error: homeworksError } = await supabase
-    .from("homeworks")
-    .select("id, lesson_id, messages")
-    .eq("user_id", user_id)
-    .eq('readLastMessage', false)
-
-  if (homeworksError) {
-    console.error(homeworksError);
-    return res.status(500).json({ error: 'Ошибка при получении homeworks' });
-  }
-
-  return res.json(homeworks);
 });
 
 app.post('/create-invoice', async (req, res) => {
@@ -831,46 +853,50 @@ app.post("/send-email", async (req, res) => {
 
   const code = generateCode()
 
-  const { error: deleteError } = await supabase
+  try{
+    const { error: deleteError } = await supabase
     .from("confirmEmail")
     .delete()
     .eq("email", to);
 
-  if (deleteError) {
-    console.error("Ошибка при удалении старых записей:", deleteError.message);
-    return res.status(500).json({ success: false, error: "Ошибка при удалении старых кодов" });
-  }
+    if (deleteError) {
+      console.error("Ошибка при удалении старых записей:", deleteError.message);
+      return res.status(500).json({ success: false, error: "Ошибка при удалении старых кодов" });
+    }
 
-  const { data, error } = await supabase
-    .from("confirmEmail")
-    .insert([
-      {
-        email: to,
-        code: code
-      }
-    ]);
+    const { data, error } = await supabase
+      .from("confirmEmail")
+      .insert([
+        {
+          email: to,
+          code: code
+        }
+      ]);
 
-  if (error) {
-    console.error("Ошибка при добавлении записи:", error.message);
-    res.status(500).json({ success: false, error: 'Ошибка при создания кода' });
-  }
+    if (error) {
+      console.error("Ошибка при добавлении записи:", error.message);
+      res.status(500).json({ success: false, error: 'Ошибка при создания кода' });
+    }
 
-  try {
-    const info = await transporter.sendMail({
-      from: `"Neuro Aura" <${process.env.SMTP_USER}>`, // От кого
-      to, // Кому
-      subject: "Nero Aura: код", // Тема письма
-      html: `<h3>Спасибо за регистрацию.</h3>
-<p>Введите следующий код на сайте для подтверждения:</p>
-<h2 style="color: #007bff;">🔢 Ваш код: <strong>${code}</strong></h2>
-<p>Если вы не запрашивали регистрацию на сайте neuro-aura.com , просто проигнорируйте это сообщение.</p>
-<p>С уважением,<br>Команда поддержки</p>` // Текст письма
-    });
+    try {
+      const info = await transporter.sendMail({
+        from: `"Neuro Aura" <${process.env.SMTP_USER}>`, // От кого
+        to, // Кому
+        subject: "Nero Aura: код", // Тема письма
+        html: `<h3>Спасибо за регистрацию.</h3>
+  <p>Введите следующий код на сайте для подтверждения:</p>
+  <h2 style="color: #007bff;">🔢 Ваш код: <strong>${code}</strong></h2>
+  <p>Если вы не запрашивали регистрацию на сайте neuro-aura.com , просто проигнорируйте это сообщение.</p>
+  <p>С уважением,<br>Команда поддержки</p>` // Текст письма
+      });
 
-    return res.json({ success: true, message: "Email sent!", info });
-  } catch (error) {
-    console.error("Ошибка при отправке email:", error);
-    return res.status(500).json({ success: false, error: error.message });
+      return res.json({ success: true, message: "Email sent!", info });
+    } catch (error) {
+      console.error("Ошибка при отправке email:", error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }catch (err){
+    res.status(500).json({ success: false, error: err.message });
   }
 })
 

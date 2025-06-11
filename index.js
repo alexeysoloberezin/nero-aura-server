@@ -142,9 +142,13 @@ app.post('/get-lessons', async (req, res) => {
 app.post('/get-lesson', async (req, res) => {
   const { token, courseId, lessonId } = req.body
 
+  console.log('get-lesson', req.body)
+
   if (!token || !courseId || !lessonId) return res.json({ message: 'Ошибка' })
 
   const { data: user, error } = await supabase.auth.getUser(token)
+
+  console.log('get-lesson-user', user)
 
   // обработка ошибка
   const { data: existingUser, error: fetchError } = await supabase
@@ -153,7 +157,10 @@ app.post('/get-lesson', async (req, res) => {
     .eq('email', user.user.email)
     .single();
 
+  console.log('get-lesson-existingUser', existingUser)
+
   if (!existingUser.available_courses.includes(courseId)) {
+    console.log('get-lesson-error', error)
     return res.status(400).json({ message: 'Курс не куплен' })
   }
 
@@ -163,6 +170,7 @@ app.post('/get-lesson', async (req, res) => {
     .eq('id', lessonId)
     .single();
 
+  console.log('get-lesson-data', data)
   if (error) {
     return res.status(500).json({ error: error.message }); // Явно выбрасываем ошибку
   }

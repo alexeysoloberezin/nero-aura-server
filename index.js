@@ -406,6 +406,27 @@ app.post('/notifications', async (req, res) => {
   }
 });
 
+app.post('/send-anketa', async (req, res) => {
+  try{
+    const { clientId } = req.body;
+
+    fetch(`https://chatter.salebot.pro/api/e580ab8279f420cfa577732738682599/message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        message: 'Спасибо, за заполнение анкеты. Напишите боту, код на продолжение: 891'
+      })
+    })
+
+    return res.json({ success: true, message: 'Анкета отправлена' });
+  }catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+})
+
 app.post('/create-invoice', async (req, res) => {
   try {
     const { email, currency, paymentMethod, tariff, alreadyCreated } = req.body;

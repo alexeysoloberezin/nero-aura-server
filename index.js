@@ -408,7 +408,7 @@ app.post('/notifications', async (req, res) => {
 
 app.post('/send-anketa', async (req, res) => {
   try{
-    const { clientId } = req.body;
+    const { client_id } = req.body;
 
     fetch(`https://chatter.salebot.pro/api/e580ab8279f420cfa577732738682599/message`, {
       method: 'POST',
@@ -416,7 +416,7 @@ app.post('/send-anketa', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        client_id: clientId,
+        client_id: client_id,
         message: 'Спасибо, за заполнение анкеты. Напишите боту, код на продолжение: 891'
       })
     })

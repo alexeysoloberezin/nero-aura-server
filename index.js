@@ -38,22 +38,22 @@ const allowedOrigins = [
   'https://neroaura-git-development-alexeysoloberezins-projects.vercel.app'
 ]
 // Middleware
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      callback(new Error('⛔️ Not allowed by CORS: ' + origin))
-    }
-  },
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true
-}))
 // app.use(cors({
-//   origin: '*',
+//   origin: function (origin, callback) {
+//     if (!origin || allowedOrigins.includes(origin)) {
+//       callback(null, true)
+//     } else {
+//       callback(new Error('⛔️ Not allowed by CORS: ' + origin))
+//     }
+//   },
 //   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
 //   credentials: true
 // }))
+app.use(cors({
+  origin: '*',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true
+}))
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(uploadRoute);
@@ -67,6 +67,143 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER, // Email от Mail.ru
     pass: process.env.SMTP_PASS  // Пароль приложения
   }
+});
+
+async function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  
+  if (error || !user) {
+    return res.status(401).json({ error: 'Invalid token', details: error?.message });
+  }
+  
+  req.user = user; 
+  next();
+}
+
+app.get('/user/me', authenticate, async (req, res) => {
+  const userId = req.user.id;
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching profile:', error);
+    return res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+
+  if (!profile) {
+    return res.json({
+      id: req.user.id,
+      email: req.user.email,
+      telegram: null,
+      hasTelegram: false,
+      available_courses: [],
+      message: 'Profile not found, please complete registration'
+    });
+  }
+
+  res.json({
+    id: profile.id,
+    email: profile.email,
+    telegram: profile.telegram || null,
+    hasTelegram: !!(profile.telegram),
+    created_at: profile.created_at,
+    available_courses: profile.available_courses,
+    updated_at: profile.updated_at,
+  });
+});
+
+app.get('/user/telegram', authenticate, async (req, res) => {
+  const userId = req.user.id;
+  
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('telegram')
+    .eq('id', userId)
+    .maybeSingle();
+  
+  if (error) {
+    console.error('Error fetching profile:', error);
+    return res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+  
+  const hasTelegram = !!(profile && profile.telegram);
+  res.json({ 
+    hasTelegram, 
+    telegram: profile?.telegram || null 
+  });
+});
+
+// POST /api/user/telegram - добавить или обновить telegram пользователя
+app.post('/user/telegram', authenticate, async (req, res) => {
+  const userId = req.user.id;
+  const { telegram } = req.body;
+  
+  if (!telegram || typeof telegram !== 'string' || telegram.trim() === '') {
+    return res.status(400).json({ error: 'telegram is required and must be a non-empty string' });
+  }
+  
+  // Опционально: проверка формата telegram (например, начинается с @)
+  if (!telegram.startsWith('@')) {
+    return res.status(400).json({ error: 'Telegram username should start with @' });
+  }
+  
+  // Сначала проверяем, существует ли профиль
+  const { data: existing, error: fetchError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+  
+  if (fetchError) {
+    console.error('Error checking profile:', fetchError);
+    return res.status(500).json({ error: 'Database error' });
+  }
+  
+  let result;
+  if (!existing) {
+    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+    if (userError || !userData.user) {
+      console.error('Error fetching user email:', userError);
+      return res.status(500).json({ error: 'Cannot create profile: user not found' });
+    }
+    const email = userData.user.email;
+    
+    result = await supabase
+      .from('profiles')
+      .insert({ id: userId, email, telegram: telegram.trim() })
+      .select('telegram')
+      .single();
+  } else {
+    // Обновляем существующий профиль
+    result = await supabase
+      .from('profiles')
+      .update({ telegram: telegram.trim() })
+      .eq('id', userId)
+      .select('telegram')
+      .single();
+  }
+  
+  if (result.error) {
+    console.error('Error upserting telegram:', result.error);
+    return res.status(500).json({ error: 'Failed to save telegram' });
+  }
+  
+  res.json({ 
+    success: true, 
+    telegram: result.data.telegram,
+    message: 'Telegram updated successfully'
+  });
 });
 
 app.post("/reset-password-action", async (req, res) => {
@@ -138,7 +275,7 @@ app.post('/get-lessons', async (req, res) => {
     .order('id')
 
     if (error) {
-      return res.status(500).json({ error: error.message }); // Явно выбрасываем ошибку
+      return res.status(500).json({ error: error.message }); 
     }
 
     return res.json(data);
@@ -192,13 +329,11 @@ app.post("/reset-password", async (req, res) => {
   }
 
   try{
-    const token = uuidv4(); // 📌 Генерируем уникальный токен
+    const token = uuidv4(); 
     const resetLink = `https://www.neuro-aura.com/app/resetPassword?email=${to}&token=${token}`;
   
-    // 📌 1. Удаляем старые токены, если они есть
     await supabase.from("resetPassword").delete().eq("email", to);
   
-    // 📌 2. Сохраняем новый токен в Supabase
     const { error: insertError } = await supabase
       .from("resetPassword")
       .insert([{ email: to, token }]);
@@ -209,7 +344,6 @@ app.post("/reset-password", async (req, res) => {
     }
   
     try {
-      // 📌 3. Отправляем email со ссылкой
       const info = await transporter.sendMail({
         from: `"Neuro Aura" <${process.env.SMTP_USER}>`,
         to,
@@ -247,7 +381,7 @@ app.post("/confirm-email", async (req, res) => {
       .from("confirmEmail")
       .select("*")
       .eq("email", to)
-      .order("created_at", { ascending: false }) // Сортируем от новой к старой
+      .order("created_at", { ascending: false }) 
       .limit(1)
       .single()
 
@@ -335,7 +469,7 @@ app.post("/send-email", async (req, res) => {
 });
 
 const authMiddleware = async (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1]; // Берём токен из заголовка
+  const token = req.headers.authorization?.split(" ")[1]; 
 
   if (!token) {
     return res.status(401).json({ error: "Нет токена" });
@@ -351,7 +485,7 @@ const authMiddleware = async (req, res, next) => {
   req.user = user; // Сохраняем данные пользователя в запрос
   next();
 };
-// 📌 Получить всех пользователей
+
 app.get('/', (req, res) => {
   res.send('ALL работает!');
 });
@@ -438,6 +572,9 @@ app.post('/create-invoice', async (req, res) => {
       .eq('email', email)
       .maybeSingle();
 
+    console.log('existingUser', existingUser)
+    console.log('body', req.body)
+
     if (fetchError) {
       return res.status(500).json({ message: 'Ошибка при проверке профиля' })
     }
@@ -457,24 +594,30 @@ app.post('/create-invoice', async (req, res) => {
       currency,
       paymentMethod
     };
+    console.log('data', data)
 
-    console.log('create-invoce for tariff_id:', tariff.tariff_id)
-
-    const response = await axios.post(
-      'https://gate.lava.top/api/v2/invoice',
-      data,
-      {
-        headers: {
-          accept: 'application/json',
-          'X-Api-Key': process.env.API_KEY, // Ключ из .env
-          'Content-Type': 'application/json'
+    try{
+      const response = await axios.post(
+        'https://gate.lava.top/api/v2/invoice',
+        data,
+        {
+          headers: {
+            accept: 'application/json',
+            'X-Api-Key': process.env.API_KEY, // Ключ из .env
+            'Content-Type': 'application/json'
+          }
         }
-      }
-    );
+      );
+      console.log(response)
 
+      res.json({ success: true, data: response.data });
 
-    res.json({ success: true, data: response.data });
+    }catch(err){
+      console.log(err)
+      res.json({err: err})
+    }
   } catch (error) {
+    console.log(error)
     res.status(error.response?.status || 500).json({
       success: false,
       error: error.response?.data || error.message
@@ -483,21 +626,25 @@ app.post('/create-invoice', async (req, res) => {
 });
 
 const listTarrifsByAmount = {
-  "10": {
+  "9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae": {
     tariff_id: "9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae",
     course_id: "1"
   },
-  "15": {
+  "2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9": {
     tariff_id: "2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9",
     course_id: "2"
   },
-  "19": {
+  "359a02c8-1ea3-4118-ac51-0b7d5d6e0463": {
     tariff_id: "359a02c8-1ea3-4118-ac51-0b7d5d6e0463",
     course_id: "3"
   },
-  "39": {
+  "f45d2bf2-19f0-472b-ac81-5567d53322e8": {
     tariff_id: "f45d2bf2-19f0-472b-ac81-5567d53322e8",
     course_id: "4"
+  },
+  "b8a90ee8-f728-4b4f-8780-d1dd5c1f7381": {
+    tariff_id: "f45d2bf2-19f0-472b-ac81-5567d53322e8",
+    course_id: "5"
   }
 }
 
@@ -518,7 +665,7 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
         .single();
 
       const amount = webhookData.amount + ''
-      const tariffData = listTarrifsByAmount?.[amount]
+      const tariffData =  listTarrifsByAmount?.[webhookData.product.id]
 
       if (!tariffData) {
         console.error('Тариф не найден в courses_tariffs по amount:', tariffData)

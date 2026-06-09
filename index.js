@@ -293,26 +293,32 @@ app.post('/get-lesson', async (req, res) => {
   try{
     const { data: user, error } = await supabase.auth.getUser(token)
 
-    // обработка ошибка
+    if (error || !user) {
+      return res.status(401).json({ message: 'Неверный токен' })
+    }
+
     const { data: existingUser, error: fetchError } = await supabase
       .from('profiles')
       .select('*')
       .eq('email', user.user.email)
       .single();
   
+    if (fetchError || !existingUser) {
+      return res.status(404).json({ message: 'Профиль не найден' })
+    }
   
-    if (!existingUser.available_courses.includes(courseId)) {
+    if (!existingUser.available_courses?.includes(courseId)) {
       return res.status(400).json({ message: 'Курс не куплен' })
     }
   
-    const { data, status } = await supabase
+    const { data, error: lessonError } = await supabase // переименуйте error
       .from(ids[courseId])
       .select('*')
       .eq('id', lessonId)
       .single();
-  
-    if (error) {
-      return res.status(500).json({ error: error.message }); // Явно выбрасываем ошибку
+
+    if (lessonError) {
+      return res.status(500).json({ error: lessonError.message });
     }
   
     return res.json(data);

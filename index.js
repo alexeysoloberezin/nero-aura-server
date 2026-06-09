@@ -265,8 +265,9 @@ const ids = {
   '4': 'photosession',
 }
 
-app.post('/get-lessons', async (req, res) => {
+app.post('/get-lessons', authenticate, async (req, res) => {
   const { courseId, lessonId } = req.body
+  const userId = req.user.id;
 
   try{
     const { data, error } = await supabase
@@ -284,8 +285,10 @@ app.post('/get-lessons', async (req, res) => {
   }
 })
 
-app.post('/get-lesson', async (req, res) => {
+app.post('/get-lesson',authenticate, async (req, res) => {
   const { token, courseId, lessonId } = req.body
+  const userEmail = req.user.email;
+
 
   if (!token || !courseId || !lessonId) {
     return res.status(400).json({ message: 'Ошибка' })
@@ -294,20 +297,10 @@ app.post('/get-lesson', async (req, res) => {
   try {
     console.log('🚀 Starting parallel requests...')
     
-    // Запускаем авторизацию и сразу начинаем готовить другие запросы
-    const authPromise = supabase.auth.getUser(token)
-    
     // Параллельно готовим запросы (они пока не выполняются)
     const tableName = ids[courseId]
     if (!tableName) {
       return res.status(400).json({ message: 'Invalid course ID' })
-    }
-
-    // Ждем результат авторизации
-    const { data: user, error: authError } = await authPromise
-    
-    if (authError || !user) {
-      return res.status(401).json({ message: 'Неверный токен' })
     }
 
     // Теперь параллельно выполняем запросы профиля и урока
@@ -315,7 +308,7 @@ app.post('/get-lesson', async (req, res) => {
       supabase
         .from('profiles')
         .select('available_courses')
-        .eq('email', user.user.email)
+        .eq('email', userEmail)
         .single(),
       supabase
         .from(tableName)

@@ -287,16 +287,32 @@ app.post('/get-lessons', async (req, res) => {
 app.post('/get-lesson', async (req, res) => {
   const { token, courseId, lessonId } = req.body
 
+  // Лог начала запроса
+  console.log('=== GET-LESSON REQUEST START ===')
+  console.log('Timestamp:', new Date().toISOString())
+  console.log('Request body:', { 
+    hasToken: !!token, 
+    tokenPreview: token ? `${token.substring(0, 20)}...` : null,
+    courseId, 
+    lessonId 
+  })
 
-  if (!token || !courseId || !lessonId) return res.json({ message: 'Ошибка' })
+  if (!token || !courseId || !lessonId) {
+    console.log('❌ Missing required fields:', { token: !!token, courseId, lessonId })
+    return res.json({ message: 'Ошибка' })
+  }
 
   try{
+    console.log('🔐 Attempting to get user with token...')
     const { data: user, error } = await supabase.auth.getUser(token)
 
     if (error || !user) {
+      console.log('❌ Auth error:', error?.message || 'User not found')
       return res.status(401).json({ message: 'Неверный токен' })
     }
+    console.log('✅ User authenticated:', { email: user.user?.email, userId: user.user?.id })
 
+    console.log('📊 Fetching user profile from profiles table...')
     const { data: existingUser, error: fetchError } = await supabase
       .from('profiles')
       .select('*')
@@ -304,25 +320,67 @@ app.post('/get-lesson', async (req, res) => {
       .single();
   
     if (fetchError || !existingUser) {
+      console.log('❌ Profile fetch error:', fetchError?.message || 'Profile not found')
+      console.log('Searched for email:', user.user.email)
       return res.status(404).json({ message: 'Профиль не найден' })
     }
+    console.log('✅ Profile found:', { 
+      userId: existingUser.id, 
+      email: existingUser.email,
+      availableCourses: existingUser.available_courses 
+    })
   
+    console.log('🎓 Checking course access...')
+    console.log(`Course ID: ${courseId}, Available courses: ${existingUser.available_courses}`)
+    
     if (!existingUser.available_courses?.includes(courseId)) {
+      console.log('❌ Course not purchased. User has:', existingUser.available_courses)
       return res.status(400).json({ message: 'Курс не куплен' })
     }
-  
-    const { data, error: lessonError } = await supabase // переименуйте error
-      .from(ids[courseId])
+    console.log('✅ Course access granted')
+
+    const tableName = ids[courseId]
+    console.log(`📚 Looking up lesson from table: ${tableName} (courseId: ${courseId})`)
+    
+    if (!tableName) {
+      console.log('❌ Invalid courseId - no table mapping found:', courseId)
+      console.log('Available ids mapping:', Object.keys(ids))
+      return res.status(400).json({ message: 'Invalid course ID' })
+    }
+
+    console.log(`🔍 Fetching lesson ${lessonId} from ${tableName}...`)
+    const { data, error: lessonError } = await supabase
+      .from(tableName)
       .select('*')
       .eq('id', lessonId)
       .single();
 
     if (lessonError) {
+      console.log('❌ Lesson fetch error:', lessonError.message)
+      console.log('Query details:', { table: tableName, lessonId })
       return res.status(500).json({ error: lessonError.message });
     }
-  
+    
+    if (!data) {
+      console.log('❌ Lesson not found:', { table: tableName, lessonId })
+      return res.status(404).json({ message: 'Lesson not found' })
+    }
+    
+    console.log('✅ Lesson fetched successfully:', { 
+      lessonId: data.id, 
+      lessonTitle: data.title,
+      hasContent: !!data.content 
+    })
+    console.log('=== GET-LESSON REQUEST END (SUCCESS) ===\n')
+    
     return res.json(data);
+    
   }catch (err){
+    console.log('💥 CATASTROPHIC ERROR in catch block:')
+    console.log('Error name:', err.name)
+    console.log('Error message:', err.message)
+    console.log('Error stack:', err.stack)
+    console.log('=== GET-LESSON REQUEST END (ERROR) ===\n')
     res.status(500).json({ success: false, error: err.message });
   }
 })

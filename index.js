@@ -60,7 +60,7 @@ app.use(uploadRoute);
 app.use("/uploads", express.static("uploads"));
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.mail.ru",
+  host: "smtp.gmail.com",
   port: 465, // Или 587
   secure: true, // true для 465, false для 587
   auth: {
@@ -847,7 +847,7 @@ async function createAccountAfterPayment(to, courseToAdd) {
         <div class="code-box">${password}</div>
         
         <br/>
-        <a href="https://neuro-aura.com/ru/app/thanks?email=${to}" class="button">Войти на сайт</a>
+        <a href="https://neuro-aura.com/app/thanks?email=${to}" class="button">Войти на сайт</a>
         <p>
         Важно: Для обеспечения безопасности вашего аккаунта настоятельно рекомендуем сменить временный пароль при первом входе.
         </p>
@@ -964,7 +964,7 @@ app.post('/check-email', async (req, res) => {
         <div class="code-box">${code}</div>
         
         <br/>
-        <a href="https://neuro-aura.com/ru/app/thanks" class="button">Войти на сайт</a>
+        <a href="https://neuro-aura.com/app/thanks" class="button">Войти на сайт</a>
         <p>
         Важно: Для обеспечения безопасности вашего аккаунта настоятельно рекомендуем сменить временный пароль при первом входе.
         </p>

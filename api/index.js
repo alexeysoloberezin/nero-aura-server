@@ -1144,3 +1144,5 @@ app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
   console.log('API_KEY:', API_KEY)
 });
+
+module.exports = app;

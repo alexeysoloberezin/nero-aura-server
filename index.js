@@ -1129,6 +1129,7 @@ app.get('/get-products', async (req, res) => {
         }
       }
     );
+    
 
     res.json({ success: true, data: response.data });
   } catch (error) {

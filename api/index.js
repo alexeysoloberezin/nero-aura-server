@@ -10,7 +10,7 @@ const uploadRoute = require("../upload");
 
 dotenv.config()
 
-const PORT = 5000;
+const PORT = 3000;
 const API_KEY = process.env.API_KEY
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET
 

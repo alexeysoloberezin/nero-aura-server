@@ -681,6 +681,14 @@ app.post('/create-invoice', async (req, res) => {
     });
   }
 });
+const listTarrifsByAmountReverse = {
+  "b8a90ee8-f728-4b4f-8780-d1dd5c1f7381": {
+    course_id: "5",
+  },
+  "e28ab16f-d997-487f-b0b1-bec2baa346ce": {
+    course_id: "5",
+  }
+}
 
 
 
@@ -693,14 +701,7 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
     if (webhookData.status === 'completed') {
       const buyerEmail = webhookData.buyer.email;
       let customFields = webhookData.custom_fields;
-      let tariff = customFields?.utm_tariff
-
-      if(!tariff){
-        console.error('Тариф отсутсву')
-        return res.status(400).json({ error: 'Тариф отсутсвует' })
-      }
-
-      console.log('customFiuld:', customFields)
+      let tariff = customFields.utm_tariff
 
       // Проверяем, существует ли пользователь
       const { data: existingUser, error: fetchError } = await supabase
@@ -710,7 +711,7 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
         .single();
 
       const amount = webhookData.amount + ''
-      const tariffData =  listTarrifsByAmount?.[tariff]
+      const tariffData =  listTarrifsByAmountReverse?.[webhookData.product.id]
 
       if (!tariffData) {
         console.error('Тариф не найден в courses_tariffs по amount:', tariffData)

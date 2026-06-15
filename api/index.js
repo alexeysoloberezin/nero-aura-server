@@ -647,9 +647,7 @@ app.post('/create-invoice', async (req, res) => {
       ...(paymentMethod && { paymentMethod: paymentMethod }),
       ...(paymentProvider && { paymentProvider: paymentProvider }),
       promoCode: promoCode,
-      custom_fields: {
-        utm_tariff: tariff  // любые ваши данные можно передать сюда
-      }
+     
     };
     console.log('data', data)
 
@@ -700,8 +698,6 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
 
     if (webhookData.status === 'completed') {
       const buyerEmail = webhookData.buyer.email;
-      let customFields = webhookData.custom_fields;
-      let tariff = customFields.utm_tariff
 
       // Проверяем, существует ли пользователь
       const { data: existingUser, error: fetchError } = await supabase

@@ -602,9 +602,15 @@ const listTarrifsByAmount = {
     tariff_id: "f45d2bf2-19f0-472b-ac81-5567d53322e8",
     course_id: "4"
   },
+  "e28ab16f-d997-487f-b0b1-bec2baa346ce": {
+    tariff_id: "e28ab16f-d997-487f-b0b1-bec2baa346ce",
+    course_id: "5",
+    locale: "ru"
+  },
   "b8a90ee8-f728-4b4f-8780-d1dd5c1f7381": {
-    tariff_id: "f45d2bf2-19f0-472b-ac81-5567d53322e8",
-    course_id: "5"
+    tariff_id: "b8a90ee8-f728-4b4f-8780-d1dd5c1f7381",
+    course_id: "5",
+    locale: "en"
   }
 }
 

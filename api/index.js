@@ -616,7 +616,7 @@ const listTarrifsByAmount = {
 
 app.post('/create-invoice', async (req, res) => {
   try {
-    const { email, tariff, locale } = req.body;
+    const { email, tariff,  currency, promoCode} = req.body;
 
     const { data: existingUser, error: fetchError } = await supabase
       .from('profiles')
@@ -643,7 +643,8 @@ app.post('/create-invoice', async (req, res) => {
     const data = {
       email,
       offerId: tariff,
-      currency: locale === 'ru' ? 'RUB' : "USD",
+      currency: currency,
+      promoCode: promoCode
     };
     console.log('data', data)
 
@@ -654,7 +655,7 @@ app.post('/create-invoice', async (req, res) => {
         {
           headers: {
             accept: 'application/json',
-            'X-Api-Key': process.env.API_KEY, // Ключ из .env
+            'X-Api-Key': process.env.API_KEY, 
             'Content-Type': 'application/json'
           }
         }

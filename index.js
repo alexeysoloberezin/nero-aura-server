@@ -617,7 +617,8 @@ app.post('/create-invoice', async (req, res) => {
       offerId: tariff.tarrif_id,
       buyerLanguage: 'EN',
       currency,
-      paymentMethod
+      paymentMethod,
+      
     };
     console.log('data', data)
 

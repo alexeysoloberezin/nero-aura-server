@@ -646,7 +646,10 @@ app.post('/create-invoice', async (req, res) => {
       currency: currency,
       ...(paymentMethod && { paymentMethod: paymentMethod }),
       ...(paymentProvider && { paymentProvider: paymentProvider }),
-      promoCode: promoCode
+      promoCode: promoCode,
+      custom_fields: {
+        utm_tariff: tariff  // любые ваши данные можно передать сюда
+      }
     };
     console.log('data', data)
 
@@ -689,6 +692,10 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
 
     if (webhookData.status === 'completed') {
       const buyerEmail = webhookData.buyer.email;
+      let customFields = webhookData.custom_fields;
+      let tariff = customFields.utm_tariff
+
+      console.log('customFiuld:', customFields)
 
       // Проверяем, существует ли пользователь
       const { data: existingUser, error: fetchError } = await supabase
@@ -698,7 +705,7 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
         .single();
 
       const amount = webhookData.amount + ''
-      const tariffData =  listTarrifsByAmount?.[webhookData.product.id]
+      const tariffData =  listTarrifsByAmount?.[tariff]
 
       if (!tariffData) {
         console.error('Тариф не найден в courses_tariffs по amount:', tariffData)

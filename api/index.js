@@ -616,7 +616,7 @@ const listTarrifsByAmount = {
 
 app.post('/create-invoice', async (req, res) => {
   try {
-    const { email, tariff,  currency, promoCode} = req.body;
+    const { email, tariff,  currency, promoCode, paymentProvider, paymentMethod} = req.body;
 
     const { data: existingUser, error: fetchError } = await supabase
       .from('profiles')
@@ -644,6 +644,8 @@ app.post('/create-invoice', async (req, res) => {
       email,
       offerId: tariff,
       currency: currency,
+      ...(paymentMethod && { paymentMethod: paymentMethod }),
+      ...(paymentProvider && { paymentProvider: paymentProvider }),
       promoCode: promoCode
     };
     console.log('data', data)

@@ -585,45 +585,65 @@ app.post('/send-anketa', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 })
+const listTarrifsByAmount = {
+  "9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae": {
+    tariff_id: "9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae",
+    course_id: "1"
+  },
+  "2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9": {
+    tariff_id: "2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9",
+    course_id: "2"
+  },
+  "359a02c8-1ea3-4118-ac51-0b7d5d6e0463": {
+    tariff_id: "359a02c8-1ea3-4118-ac51-0b7d5d6e0463",
+    course_id: "3"
+  },
+  "f45d2bf2-19f0-472b-ac81-5567d53322e8": {
+    tariff_id: "f45d2bf2-19f0-472b-ac81-5567d53322e8",
+    course_id: "4"
+  },
+  "b8a90ee8-f728-4b4f-8780-d1dd5c1f7381": {
+    tariff_id: "f45d2bf2-19f0-472b-ac81-5567d53322e8",
+    course_id: "5"
+  }
+}
 
 app.post('/create-invoice', async (req, res) => {
   try {
-    const { email, currency, paymentMethod, tariff, alreadyCreated } = req.body;
+    const { email, tariff, locale } = req.body;
 
-    // TODO
     const { data: existingUser, error: fetchError } = await supabase
       .from('profiles')
       .select('*')
       .eq('email', email)
       .maybeSingle();
 
-    console.log('existingUser', existingUser)
-    console.log('body', req.body)
-
     if (fetchError) {
       return res.status(500).json({ message: 'Ошибка при проверке профиля' })
     }
 
-    if (existingUser && existingUser.available_courses.includes(tariff.id)) {
+    const courseId = listTarrifsByAmount?.[tariff]
+
+    if(!courseId) {
+      return res.status(500).json({ message: 'Course не найден' })
+    }
+
+    if (existingUser && existingUser.available_courses.includes(courseId)) {
       return res
         .status(400)
         .json({ message: 'Вы уже приобрели этот курс' })
     }
 
-    // return res.json({ existingUser, tariff, hasCourse: 'no' })
-    // ✅ Если аккаунта нет, создаём инвойс
     const data = {
       email,
-      offerId: tariff.tarrif_id,
-      buyerLanguage: 'EN',
-      currency,
-      paymentMethod
+      offerId: tariff,
+      currency: locale === 'ru' ? 'RUB' : "USD",
     };
     console.log('data', data)
 
     try{
       const response = await axios.post(
-        'https://gate.lava.top/api/v2/invoice',
+        'https://gate.lava.top/api/v3/invoice',
         data,
         {
           headers: {
@@ -650,28 +670,7 @@ app.post('/create-invoice', async (req, res) => {
   }
 });
 
-const listTarrifsByAmount = {
-  "9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae": {
-    tariff_id: "9e6ac7ff-f092-4521-8eaf-0f35cd53e8ae",
-    course_id: "1"
-  },
-  "2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9": {
-    tariff_id: "2fbfb5ef-a4a8-4d8e-af2e-98fe5a4670e9",
-    course_id: "2"
-  },
-  "359a02c8-1ea3-4118-ac51-0b7d5d6e0463": {
-    tariff_id: "359a02c8-1ea3-4118-ac51-0b7d5d6e0463",
-    course_id: "3"
-  },
-  "f45d2bf2-19f0-472b-ac81-5567d53322e8": {
-    tariff_id: "f45d2bf2-19f0-472b-ac81-5567d53322e8",
-    course_id: "4"
-  },
-  "b8a90ee8-f728-4b4f-8780-d1dd5c1f7381": {
-    tariff_id: "f45d2bf2-19f0-472b-ac81-5567d53322e8",
-    course_id: "5"
-  }
-}
+
 
 app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
   try {

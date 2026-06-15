@@ -693,7 +693,12 @@ app.post('/lava-webhook', apiKeyMiddleware, async (req, res) => {
     if (webhookData.status === 'completed') {
       const buyerEmail = webhookData.buyer.email;
       let customFields = webhookData.custom_fields;
-      let tariff = customFields.utm_tariff
+      let tariff = customFields?.utm_tariff
+
+      if(!tariff){
+        console.error('Тариф отсутсву')
+        return res.status(400).json({ error: 'Тариф отсутсвует' })
+      }
 
       console.log('customFiuld:', customFields)
 

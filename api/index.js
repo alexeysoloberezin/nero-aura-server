@@ -614,9 +614,21 @@ const listTarrifsByAmount = {
   }
 }
 
+// Валюты, которые поддерживает lava.top. Цена в каждой валюте задаётся на самом оффере
+// в кабинете lava.top, поэтому для EUR на оффере должна быть включена цена в EUR.
+const SUPPORTED_CURRENCIES = ['RUB', 'USD', 'EUR']
+
 app.post('/create-invoice', async (req, res) => {
   try {
-    const { email, tariff,  currency, promoCode, paymentProvider, paymentMethod} = req.body;
+    const { email, tariff,  currency: rawCurrency, promoCode, paymentProvider, paymentMethod} = req.body;
+
+    const currency = rawCurrency ? String(rawCurrency).toUpperCase() : rawCurrency
+
+    if (currency && !SUPPORTED_CURRENCIES.includes(currency)) {
+      return res
+        .status(400)
+        .json({ message: `Валюта ${rawCurrency} не поддерживается` })
+    }
 
     const { data: existingUser, error: fetchError } = await supabase
       .from('profiles')
@@ -668,8 +680,20 @@ app.post('/create-invoice', async (req, res) => {
       res.json({ success: true, data: response.data });
 
     }catch(err){
-      console.log(err)
-      res.json({err: err})
+      // Отдаём настоящую причину отказа lava.top (например, валюта недоступна для оффера),
+      // а не 200 с обёрнутой ошибкой Axios, из которой причину не достать.
+      const status = err.response?.status || 500
+      const lavaError = err.response?.data
+      console.log('lava invoice error', status, currency, tariff, lavaError ? JSON.stringify(lavaError) : err.message)
+
+      const rawMessage = (lavaError && (lavaError.message || lavaError.error || lavaError.detail)) || err.message
+      const message = typeof rawMessage === 'string' ? rawMessage : JSON.stringify(rawMessage)
+
+      return res.status(status).json({
+        success: false,
+        message,
+        error: lavaError || err.message
+      })
     }
   } catch (error) {
     console.log(error)
